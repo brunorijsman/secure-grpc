@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package adder;
+
+message AddRequest {
+    int32 a = 1;
+    int32 b = 2;
+}
+
+message AddReply {
+    int32 sum = 1;
+    bool overflow = 2;
+}
+
+service Adder {
+    rpc Add (AddRequest) returns (AddReply);
+}
