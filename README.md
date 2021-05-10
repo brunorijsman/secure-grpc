@@ -1,15 +1,31 @@
-# Securing Google Remote Procedure Calls (GRPC)
+# Securing Google Remote Procedure Calls (gRPC)
 
-TODO: This is for asyncio
+This is a step-by-step tutorial on how to secure Google Remote Procedure Calls (gRPC) using
+asynchronous Python (asyncio).
 
-This is a tutorial on how to secure Google Remote Procedure Calls (GRPC) using Transport Layer
-Security (TLS).
+1. Start with an unsecured service (no authentication and no encryption).
 
-We will be using Python, but the same principles apply to any other programming language.
+2. TODO Add encryption and client authentication of the server (manual installation of the server
+   certificate at the client).
 
-## Getting setup
+3. TODO Use a certificate authority (CA) instead of manual installation of certificates.
 
-The following step describe how to setup the environment for following this tutorial.
+4. TODO Mutual authentication: the server also authenticates the server.
+
+We use the official [Python gRPC AsyncIO API](https://grpc.github.io/grpc/python/grpc_asyncio.html),
+also known as "grpcio", which is part of the official
+[Python gRPC API](https://grpc.io/docs/languages/python/)
+in the official [gRPC implementation](https://grpc.io/).
+
+There is also an older third-party implementation of the Python gRPC AsyncIO API, knows as 
+"[grpclib](https://pypi.org/project/grpclib/)" ([GitHub repo](https://github.com/vmagamedov/grpclib)).
+We won't be using this library. Many code fragments that show up in Google or StackOverflow search
+results are based on grpclib instead of grpcio and won't work with the code in this tutoral. Be
+careful!
+
+## Setup
+
+The following steps describe how to setup the environment for following this tutorial.
 
 Clone the `secure-grp` GitHub repository.
 
@@ -33,7 +49,12 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## A simple GRPC `adder` service
+## The unsecured `Adder` service.
+
+We start with an unsecured gRPC service.
+This will help us understand the basics of writing gRPC servers and clients in asynchronous Python
+before we add the extra complications of authentication and encryption, which we will cover in later
+sections.
 
 The repository already contains the `adder.proto` which defines a very simple GRPC `Adder` service
 that can add two numbers.
@@ -61,26 +82,25 @@ service Adder {
 Run the protobuf compiler.
 
 ```bash
-python -m grpc_tools.protoc --proto_path=. --python_out=. --grpclib_python_out=. adder.proto 
+python -m grpc_tools.protoc --proto_path=. --python_out=. --grpc_python_out=. adder.proto 
 ```
 
 This compiles the protobuf file `adder.proto` and produces two Python module files:
 
 * Python module `adder_pb2.py` defines the protobuf message classes `AddRequest` and `AddReply`.
 
-* Python module `adder_grpc.py` defines the base class `AdderBase` for the server and the base class
-  `AdderStub` for the client.
+* Python module `adder_pb2_grpc.py` defines the base class `AdderServicer` for the server and the
+  class `AdderStub` for the client.
 
-File `server_unsafe.py` contains the unsafe (i.e. without authentication or encryption) server code:
+File `server_unsecured.py` contains the unsecured (i.e. without authentication or encryption) server
+code:
 
 ```python
-TODO
 ```
 
-File `client_unsafe.py` contains the unsafe server code:
+File `client_unsafe.py` contains the unsecured client code:
 
 ```python
-TODO
 ```
 
 
