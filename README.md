@@ -53,11 +53,11 @@ pip install -r requirements.txt
 
 We start with an unsecured gRPC service.
 This will help us understand the basics of writing gRPC servers and clients in asynchronous Python
-before we add the extra complications of authentication and encryption, which we will cover in later
-sections.
+before we introduce the extra complications of authentication and encryption, which we will cover in
+later sections.
 
-The repository already contains the `adder.proto` which defines a very simple GRPC `Adder` service
-that can add two numbers.
+The repository already contains the gRPC service definition file `adder.proto` which defines a
+very simple `Adder` service that can add two numbers.
 
 ```protobuf
 syntax = "proto3";
@@ -71,7 +71,6 @@ message AddRequest {
 
 message AddReply {
     int32 sum = 1;
-    bool overflow = 2;
 }
 
 service Adder {
@@ -85,23 +84,76 @@ Run the protobuf compiler.
 python -m grpc_tools.protoc --proto_path=. --python_out=. --grpc_python_out=. adder.proto 
 ```
 
-This compiles the protobuf file `adder.proto` and produces two Python module files:
+This compiles the gRPC service definition file `adder.proto` and produces two Python module files:
 
 * Python module `adder_pb2.py` defines the protobuf message classes `AddRequest` and `AddReply`.
 
-* Python module `adder_pb2_grpc.py` defines the base class `AdderServicer` for the server and the
+* Python module `adder_pb2_grpc.py` defines the class `AdderServicer` for the server and the
   class `AdderStub` for the client.
 
-File `server_unsecured.py` contains the unsecured (i.e. without authentication or encryption) server
-code:
+File `server_unsecured.py` contains the implementation of the server. At this point we don't have
+any authentication or encryption yet.
 
 ```python
+import asyncio
+import grpc
+import adder_pb2
+import adder_pb2_grpc
+
+class Adder(adder_pb2_grpc.AdderServicer):
+
+    async def Add(self, request, context):
+        reply = adder_pb2.AddReply(sum=request.a + request.b)
+        print(f"Server: {request.a} + {request.b} = {reply.sum}")
+        return reply
+
+async def serve():
+    server = grpc.aio.server()
+    adder_pb2_grpc.add_AdderServicer_to_server(Adder(), server)
+    server.add_insecure_port("127.0.0.1:50051")
+    await server.start()
+    await server.wait_for_termination()
+
+if __name__ == "__main__":
+    asyncio.run(serve())
 ```
 
-File `client_unsafe.py` contains the unsecured client code:
+File `client_unsafe.py` contains the implementation of the unsecured client:
 
 ```python
+import asyncio
+import grpc
+import adder_pb2
+import adder_pb2_grpc
+
+async def run_client():
+    async with grpc.aio.insecure_channel("127.0.0.1:50051") as channel:
+        stub = adder_pb2_grpc.AdderStub(channel)
+        request = adder_pb2.AddRequest(a=1, b=2)
+        reply = await stub.Add(request)
+        assert reply.sum == 3
+        print(f"Client: {request.a} + {request.b} = {reply.sum}")
+
+if __name__ == "__main__":
+    asyncio.run(run_client())
 ```
 
+In one terminal window, start the server:
+```
+python server_unsecured.py
+```
 
+In another terminal window, run the client:
+```
+python client_unsecured.py
+```
 
+The client produces the following output:
+```
+Client: 1 + 2 = 3
+```
+
+Back in the server terminal window, you should see the following server output:
+```
+Server: 1 + 2 = 3
+```
