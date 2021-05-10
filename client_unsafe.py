@@ -9,6 +9,7 @@ async def run_client():
         request = AddRequest(a=1, b=2)
         reply = await stub.Add(request)
         assert reply.sum == 3
+         # pylint:disable=no-member
         print(f"Client: {request.a} + {request.b} = {reply.sum}")
 
 if __name__ == "__main__":

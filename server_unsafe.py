@@ -10,6 +10,7 @@ class AdderServer(AdderBase):
         request = await stream.recv_message()
         reply = AddReply(sum=request.a + request.b)
         await stream.send_message(reply)
+         # pylint:disable=no-member
         print(f"Server: {request.a} + {request.b} = {reply.sum}")
 
 async def serve(host="127.0.0.1", port=50051):
