@@ -8,10 +8,9 @@ class AdderServer(AdderBase):
 
     async def Add(self, stream) -> None:
         request = await stream.recv_message()
-        sum_ab = request.a + request.b
-        overflow = sum_ab > 0x7fffffff or sum_ab < -0x80000000
-        reply = AddReply(sum=sum_ab, overflow=overflow)
+        reply = AddReply(sum=request.a + request.b)
         await stream.send_message(reply)
+        print(f"Server: {request.a} + {request.b} = {reply.sum}")
 
 async def serve(host="127.0.0.1", port=50051):
     server = Server([AdderServer()])

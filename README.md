@@ -1,5 +1,7 @@
 # Securing Google Remote Procedure Calls (GRPC)
 
+TODO: This is for asyncio
+
 This is a tutorial on how to secure Google Remote Procedure Calls (GRPC) using Transport Layer
 Security (TLS).
 
@@ -72,11 +74,13 @@ This compiles the protobuf file `adder.proto` and produces two Python module fil
 File `server_unsafe.py` contains the unsafe (i.e. without authentication or encryption) server code:
 
 ```python
+TODO
 ```
 
 File `client_unsafe.py` contains the unsafe server code:
 
 ```python
+TODO
 ```
 
 
