@@ -1,0 +1,10 @@
+asyncio==3.4.3
+grpcio==1.37.1
+grpcio-tools==1.37.1
+grpclib==0.4.1
+h2==4.0.0
+hpack==4.0.0
+hyperframe==6.0.1
+multidict==5.1.0
+protobuf==3.16.0
+six==1.16.0
