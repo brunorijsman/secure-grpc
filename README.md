@@ -16,15 +16,17 @@ asynchronous Python (asyncio).
 
 ## Grpcio versus grpclib
 
-We use the official [Python gRPC AsyncIO API](https://grpc.github.io/grpc/python/grpc_asyncio.html),
+In this tutorial we use the official
+[Python gRPC AsyncIO API](https://grpc.github.io/grpc/python/grpc_asyncio.html),
 also known as "grpcio", which is part of the official
 [Python gRPC API](https://grpc.io/docs/languages/python/)
 in the official [gRPC implementation](https://grpc.io/).
 
 There is also an older third-party implementation of the Python gRPC AsyncIO API, knows as 
-"[grpclib](https://pypi.org/project/grpclib/)" ([GitHub repo](https://github.com/vmagamedov/grpclib)).
+"[grpclib](https://pypi.org/project/grpclib/)"
+([GitHub repo](https://github.com/vmagamedov/grpclib)).
 We won't be using this library. Many code fragments that show up in Google or StackOverflow search
-results are based on grpclib instead of grpcio and won't work with the code in this tutoral. Be
+results are based on grpclib instead of grpcio and won't work with the code in this tutorial. Be
 careful!
 
 ## Setup

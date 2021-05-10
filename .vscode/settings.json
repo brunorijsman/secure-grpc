@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "GRPC",
+        "Grpcio",
         "asyncio",
         "grpclib",
         "proto",
