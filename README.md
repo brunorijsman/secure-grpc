@@ -1,5 +1,7 @@
 # Securing Google Remote Procedure Calls (gRPC)
 
+## Introduction
+
 This is a step-by-step tutorial on how to secure Google Remote Procedure Calls (gRPC) using
 asynchronous Python (asyncio).
 
@@ -11,6 +13,8 @@ asynchronous Python (asyncio).
 3. TODO Use a certificate authority (CA) instead of manual installation of certificates.
 
 4. TODO Mutual authentication: the server also authenticates the server.
+
+## Grpcio versus grpclib
 
 We use the official [Python gRPC AsyncIO API](https://grpc.github.io/grpc/python/grpc_asyncio.html),
 also known as "grpcio", which is part of the official
@@ -84,15 +88,15 @@ Run the protobuf compiler.
 python -m grpc_tools.protoc --proto_path=. --python_out=. --grpc_python_out=. adder.proto 
 ```
 
-This compiles the gRPC service definition file `adder.proto` and produces two Python module files:
+This compiles the gRPC service definition file `adder.proto` and generates two Python module files:
 
 * Python module `adder_pb2.py` defines the protobuf message classes `AddRequest` and `AddReply`.
 
 * Python module `adder_pb2_grpc.py` defines the class `AdderServicer` for the server and the
   class `AdderStub` for the client.
 
-File `server_unsecured.py` contains the implementation of the server. At this point we don't have
-any authentication or encryption yet.
+Existing file `server_unsecured.py` contains the implementation of the server. At this point we
+don't have any authentication or encryption yet.
 
 ```python
 import asyncio
@@ -118,7 +122,7 @@ if __name__ == "__main__":
     asyncio.run(serve())
 ```
 
-File `client_unsafe.py` contains the implementation of the unsecured client:
+Existing file `client_unsafe.py` contains the implementation of the unsecured client:
 
 ```python
 import asyncio
@@ -157,3 +161,18 @@ Back in the server terminal window, you should see the following server output:
 ```
 Server: 1 + 2 = 3
 ```
+
+# Documentation references
+
+* [gRPC Authentication Guide](https://grpc.io/docs/guides/auth/)
+
+* [gRPC Python Documentation](https://grpc.github.io/grpc/python/index.html)
+
+* [gRPC Python AsyncIO ("grpcio") Documentation](https://grpc.github.io/grpc/python/grpc_asyncio.html)
+
+* [grpclib Homepage](https://pypi.org/project/grpclib/) [Note]
+
+* [grpclib GitHub Page](https://github.com/vmagamedov/grpclib) [Note]
+
+
+Note: This tutorial uses grpcio; it does not use grpclib.
