@@ -172,6 +172,10 @@ Server: 1 + 2 = 3
 
 * [gRPC Python AsyncIO ("grpcio") Documentation](https://grpc.github.io/grpc/python/grpc_asyncio.html)
 
+* [gRPC ALTS Documentation](https://grpc.io/docs/languages/python/alts/)
+
+* [Google ALTS Whitepaper](https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security)
+
 * [grpclib Homepage](https://pypi.org/project/grpclib/) [Note]
 
 * [grpclib GitHub Page](https://github.com/vmagamedov/grpclib) [Note]
