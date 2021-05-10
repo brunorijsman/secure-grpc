@@ -14,6 +14,10 @@ asynchronous Python (asyncio).
 
 4. TODO Mutual authentication: the server also authenticates the server.
 
+## TLS versus mTLS versus ALTS
+
+TODO
+
 ## Grpcio versus grpclib
 
 In this tutorial we use the official
@@ -164,6 +168,32 @@ Back in the server terminal window, you should see the following server output:
 Server: 1 + 2 = 3
 ```
 
+# Client authenticates server using TLS
+
+We will now update the code, on both the server and client code, to use Transport Layer Security
+(TLS) to let the client authenticate the server and to encrypt all traffic between the client and
+the server.
+
+At this point, the server does not yet authenticate the client, i.e. we do not yet have Mutual TLS
+(MTLS).
+
+Also, at this point we will be using self-signed certificates. This means we have to manually
+install the certificate for each trusted server on the client. In later sections we will describe
+how to use Certificate Authorities (CAs) to avoid this manual installation step.
+
+TODO: Generate certificate and private key on server
+
+TODO: Install server certificate on client
+
+TODO: 127.0.0.1 vs hostname etc (two different virtual machines)
+
+TODO: Diagram explaining certificates
+
+TODO: Update client code load certificate
+
+TODO: Update server code to update server certificate and private key
+
+
 # Documentation references
 
 * [gRPC Authentication Guide](https://grpc.io/docs/guides/auth/)
@@ -179,6 +209,5 @@ Server: 1 + 2 = 3
 * [grpclib Homepage](https://pypi.org/project/grpclib/) [Note]
 
 * [grpclib GitHub Page](https://github.com/vmagamedov/grpclib) [Note]
-
 
 Note: This tutorial uses grpcio; it does not use grpclib.
