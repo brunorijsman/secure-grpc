@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import argparse
 import asyncio
 import grpc
 import adder_pb2
 import adder_pb2_grpc
+import common
 
 class Adder(adder_pb2_grpc.AdderServicer):
 
@@ -13,38 +13,23 @@ class Adder(adder_pb2_grpc.AdderServicer):
         print(f"Server: {request.a} + {request.b} = {reply.sum}")
         return reply
 
-def parse_command_line_arguments():
-    parser = argparse.ArgumentParser(description="Secure gRPC demo server")
-    parser.add_argument(
-        "authentication",
-        choices=["none", "tls"],
-        default="none",
-        help="Authentication mechanism")
-    return parser.parse_args()
-
-async def server_insecure():
+async def main():
+    args = common.parse_command_line_arguments("server")
     server = grpc.aio.server()
-    server.add_insecure_port("localhost:50051")
+    server_address = f"{args.server_host}:{args.server_port}"
+    if args.server_authenticated:
+        print("Server is authenticated by client")
+        server_private_key = open("server.key", "br").read()
+        server_certificate = open("server.crt", "br").read()
+        credentials = grpc.ssl_server_credentials([(server_private_key, server_certificate)])
+        server.add_secure_port(server_address, credentials)
+    else:
+        print("Server is not authenticated by client")
+        server.add_insecure_port(server_address)
     adder_pb2_grpc.add_AdderServicer_to_server(Adder(), server)
     await server.start()
-    await server.wait_for_termination()
-
-async def server_tls():
-    private_key = open("server.key", "br").read()
-    certificate = open("server.crt", "br").read()
-    credentials = grpc.ssl_server_credentials([(private_key, certificate)])
-    server = grpc.aio.server()
-    server.add_secure_port("localhost:50051", credentials)
-    adder_pb2_grpc.add_AdderServicer_to_server(Adder(), server)
-    await server.start()
-    print("Started TLS server on localhost:50051")
+    print(f"Started server on {server_address}")
     await server.wait_for_termination()
 
 if __name__ == "__main__":
-    args = parse_command_line_arguments()
-    if args.authentication == "none":
-        asyncio.run(server_insecure())
-    elif args.authentication == "tls":
-        asyncio.run(server_tls())
-    else:
-        assert False
+    asyncio.run(main())
