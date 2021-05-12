@@ -7,16 +7,40 @@ asynchronous Python (asyncio).
 
 1. Start with an unsecured service (no authentication and no encryption).
 
-2. TODO Add encryption and client authentication of the server (manual installation of the server
-   certificate at the client).
+2. Add client authentication of the server and encryption:
+   
+   a. Using self-signed certificates.
+   
+   b. TODO Using a Certificate Authority (CA) signed certificate.
 
-3. TODO Use a certificate authority (CA) instead of manual installation of certificates.
-
-4. TODO Mutual authentication: the server also authenticates the server.
+3. TODO Add server authentication of the client, i.e. mutual authentication.
 
 ## TLS versus mTLS versus ALTS
 
-TODO
+In this tutorial we look at three different [authentication protocols](https://grpc.io/docs/guides/auth/):
+
+1. [Transport Layer Security (TLS)](https://datatracker.ietf.org/doc/html/rfc8446),
+   also known by its former and deprecated name Secure Sockets Layer (SSL). 
+   This is a widely used standard protocol for providing authentication and encryption
+   at the transport (TCP) layer. It is the underlying protocol for secure application layer
+   protocols such as HTTPS. In many use cases (e.g. secure web browsing) TLS is only used for the
+   client to authenticate the server and for encryption. In such cases, some other mechanism (e.g.
+   a username and a password or a two-factor authentication hardware token) is used for the server
+   to authenticate the client.
+
+2. Mutual TLS (MTLS). When TLS is used for application-to-application communications (as opposed
+   to human-to-application communications) it is common to use TLS for both parties to authenticate
+   each other. Not only does the client authenticate the server, but the server also authenticates
+   the client.
+
+3. [Application Layer Transport Security (ALTS)](https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security) 
+   is a mutual authentication and transport encryption system developed by Google and typically used
+   for securing Remote Procedure Call (RPC) communications within Google's infrastructure. ALTS 
+   is similar in concept to MTLS but has been designed and optimized to meet the needs of Google's
+   datacenter environments.
+
+GRPC also supports a token-based authentication protocol which we will not discuss in this tutorial.
+It is intended for interacting with Google APIs provided by the Google Cloud Platform (GCP).
 
 ## Grpcio versus grpclib
 
@@ -58,6 +82,16 @@ Install the dependencies:
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+You will also need `OpenSSL`. I run macOS Catalina 10.15.7 which comes with LibreSSL version 2.8.3
+pre-installed:
+
+<pre>
+$ <b>which openssl</b>
+/usr/bin/openssl
+$ <b>openssl version</b>
+LibreSSL 2.8.3
+</pre>
 
 ## The unsecured `Adder` service.
 
@@ -170,16 +204,42 @@ Server: 1 + 2 = 3
 
 # Client authenticates server using TLS
 
-We will now update the code, on both the server and client code, to use Transport Layer Security
-(TLS) to let the client authenticate the server and to encrypt all traffic between the client and
-the server.
+We will now update the code to use Transport Layer Security (TLS) to let the client authenticate
+the server and to encrypt all traffic between the client and the server.
+At this point, the server does not yet authenticate the client, i.e. we don't Mutual TLS
+(MTLS) yet.
 
-At this point, the server does not yet authenticate the client, i.e. we do not yet have Mutual TLS
-(MTLS).
-
-Also, at this point we will be using self-signed certificates. This means we have to manually
+For now we will be using self-signed certificates. This means we have to manually
 install the certificate for each trusted server on the client. In later sections we will describe
 how to use Certificate Authorities (CAs) to avoid this manual installation step.
+
+First we need to generate a private and public key pair for the server:
+
+<pre>
+$ <b>openssl genrsa -out server.key 4096</b>
+Generating RSA private key, 4096 bit long modulus
+.......++
+...........................................................................................++
+e is 65537 (0x10001)
+</pre>
+
+TODO: Explain
+
+The `server.key` file contains text similar to the following (your key will be different):
+
+<pre>
+ $ <b>cat server.key</b>
+-----BEGIN RSA PRIVATE KEY-----
+MIIJKQIBAAKCAgEAxRvPEB+HvD8uOJd5DD7nbUHo5ehxd1dbqQfXAz49Yu4aEez9
+[...]
+yUvBaXUL5vqYcQOVgwcRGoqBTUSnHLR09PQOd1LhmS2uvwQvxNiGHNIHk7KF/glJ
+whm8PoO37dhUSSFY+1jJtmNM03iEugN0eCQb0jAPQxfob5+LoTaGc34rIQNf
+-----END RSA PRIVATE KEY-----
+</pre>
+
+The OpenSSL documentation tells you that the `genrsa` command produces a private key and that the
+`.key` file contains a private key. In reality, it is implied that a public key is also produced
+and stored.
 
 TODO: Generate certificate and private key on server
 

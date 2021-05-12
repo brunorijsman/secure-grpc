@@ -4,11 +4,14 @@
         "Grpcio",
         "MTLS",
         "asyncio",
+        "datacenter",
+        "genrsa",
         "grpclib",
         "proto",
         "protobuf",
         "protoc",
         "pylint",
         "venv"
-    ]
+    ],
+    "python.linting.pylintEnabled": true
 }
