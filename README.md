@@ -1,3 +1,5 @@
+# **THIS IS TUTORIAL IS STILL A WORK IN PROGRESS AND NOT YET COMPLETE**
+
 # Securing Google Remote Procedure Calls (gRPC)
 
 ## Introduction
