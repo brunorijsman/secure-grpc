@@ -53,13 +53,28 @@ parse_command_line_options ()
 {
     while [[ "$#" -gt 0 ]]; do
         case $1 in
-            -?|-h|--help)
+            --help|-h|-?)
                 help
                 ;;
-            -C|--client-authenticated)
+            --client-authenticated|-C)
                 CLIENT_AUTHENTICATED=${TRUE}
                 ;;
-            -x|--clean)
+            --client-host|-c)
+                CLIENT_HOST="$2"
+                shift
+                ;;
+            --server-authenticated|-S)
+                SERVER_AUTHENTICATED=${TRUE}
+                ;;
+            --server-host|-s)
+                SERVER_HOST="$2"
+                shift
+                ;;
+            --server-port|-p)
+                SERVER_PORT="$2"
+                shift
+                ;;
+            --clean|-x)
                 CLEAN=${TRUE}
                 ;;
             *)
