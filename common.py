@@ -1,4 +1,5 @@
 import argparse
+import sys
 
 def parse_command_line_arguments(role):
     parser = argparse.ArgumentParser(description=f"Secure gRPC demo {role}")
@@ -32,4 +33,9 @@ def parse_command_line_arguments(role):
         action="store_true",
         default=False,
         help="Use CA-signed certificates (default: use self-signed certificates)")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.client_authenticated and not args.server_authenticated:
+        print("If --client-authenticated is enabled, --server-authenticated must also be enabled.",
+              file=sys.stderr)
+        sys.exit(1)
+    return args
