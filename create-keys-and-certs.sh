@@ -91,7 +91,7 @@ function run_command ()
     failure_msg=$2
     output=$(${command} 2>&1)
     if [ $? -ne 0 ] ; then
-        echo "FAILED!"
+        echo "Error, the following command failed:"
         echo $command
         echo "${output}"
         exit 1
@@ -118,13 +118,14 @@ function remove_old_keys_and_certificates ()
 function create_private_key_and_self_signed_cert ()
 {
     role=$1
+    common_name=$2
     run_command "openssl \
                     req \
                     -newkey rsa:2048 \
                     -nodes \
                     -keyout ${role}.key \
                     -x509 \
-                    -subj /C=US/ST=WA/L=Seattle/O=RemoteAutonomy/CN=${COMMON_NAME} \
+                    -subj /C=US/ST=WA/L=Seattle/O=RemoteAutonomy/CN=${common_name} \
                     -out ${role}.crt" \
                 "Could not create ${role} private key and self-signed certificate"
     echo "Created ${role} private key file: ${role}.key"
@@ -133,12 +134,12 @@ function create_private_key_and_self_signed_cert ()
 
 function create_server_private_key_and_self_signed_cert ()
 {
-    create_private_key_and_self_signed_cert server
+    create_private_key_and_self_signed_cert server $SERVER_HOST
 }
 
 function create_client_private_key_and_self_signed_cert ()
 {
-    create_private_key_and_self_signed_cert client
+    create_private_key_and_self_signed_cert client $CLIENT_HOST
 }
 
 parse_command_line_options $@

@@ -5,21 +5,29 @@ import random
 import grpc
 import adder_pb2
 import adder_pb2_grpc
-import common
+from common import parse_command_line_arguments
 
 async def main():
-    args = common.parse_command_line_arguments("server")
+    args = parse_command_line_arguments("server")
     server_address = f"{args.server_host}:{args.server_port}"
-    if args.server_authenticated:
-        print("Server is authenticated by client")
-        server_certificate = open("server.crt", "br").read()
-        server_credentials = grpc.ssl_channel_credentials(server_certificate)
-        channel = grpc.aio.secure_channel(server_address, server_credentials)
-    else:
-        print("Server is not authenticated by client")
+    if args.authentication == "none":
+        print("No authentication")
         channel = grpc.aio.insecure_channel(server_address)
+    elif args.authentication == "server":
+        print("Server authentication")
+        server_certificate = open("server.crt", "br").read()
+        credentials = grpc.ssl_channel_credentials(server_certificate)
+        channel = grpc.aio.secure_channel(server_address, credentials)
+    elif args.authentication == "mutual":
+        print("Mutual authentication")
+        server_certificate = open("server.crt", "br").read()
+        client_private_key = open("client.key", "br").read()
+        client_certificate = open("client.crt", "br").read()
+        credentials = grpc.ssl_channel_credentials(server_certificate, client_private_key,
+                                                   client_certificate)
+        channel = grpc.aio.secure_channel(server_address, credentials)
     stub = adder_pb2_grpc.AdderStub(channel)
-    print(f"Using server on {server_address}")
+    print(f"Connecting to server on {server_address}")
     a = random.randint(1, 10001)
     b = random.randint(1, 10001)
     request = adder_pb2.AddRequest(a=a, b=b)
