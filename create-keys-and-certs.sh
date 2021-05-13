@@ -15,6 +15,7 @@ SERVER_HOST="localhost"
 SERVER_PORT=50051
 SIGNER="self"
 
+DAYS_VALID=3650
 ORGANIZATION="Example-Corp"
 ROOT_CA_COMMON_NAME="${ORGANIZATION}-Root-Certificate-Authority"
 INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION}-Intermediate-Certificate-Authority"
@@ -46,9 +47,11 @@ function help ()
     echo "  --server-port, -p"
     echo "      The server port number. Default: 50051."
     echo
-    echo "  --signer, -i"
-    echo "      Use Certificate Authority (CA) signed certificates (default: use self-signed"
-    echo "      certificates)"
+    echo "  --signer {self, root-ca, intermediate-ca}, -i {self, root-ca, intermediate-ca}"
+    echo "      self: server and client certificates are self-signed."
+    echo "      root-ca: server and client certificates are signed by the root CA."
+    echo "      intermediate-ca: server and client certificates are signed by an intermediate CA."
+    echo "      (Default: self)"
     echo
     echo "  -x, --clean"
     echo "      Remove all private key and certificate files."
@@ -156,6 +159,7 @@ function create_private_key_and_self_signed_cert ()
                     -keyout ${file_base}.key \
                     -x509 \
                     -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION}/CN=${common_name} \
+                    -days ${DAYS_VALID} \
                     -out ${file_base}.crt" \
                 "Could not create ${file_base} private key and self-signed certificate"
     echo "Created ${file_base} private key file: ${file_base}.key"
