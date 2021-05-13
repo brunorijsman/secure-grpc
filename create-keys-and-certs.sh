@@ -11,9 +11,13 @@ BEEP=$(tput bel)
 AUTHENTICATION="none"
 CLEAN=${FALSE}
 CLIENT_HOST="localhost"
+ORGANIZATION="Example Corp"  # TODO: Make this configurable
 SERVER_HOST="localhost"
 SERVER_PORT=50051
 SIGNER="self"
+
+ROOT_CA_COMMON_NAME="${ORGANIZATION} Root Certificate Authority"
+INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION} Intermediate Certificate Authority"
 
 help ()
 {
@@ -135,32 +139,48 @@ function remove_old_keys_and_certificates ()
     remove_file_if_it_exists "server certificate" server.crt
     remove_file_if_it_exists "client private key" client.key
     remove_file_if_it_exists "client certificate" client.crt
+    remove_file_if_it_exists "root-ca private key" root-ca.key
+    remove_file_if_it_exists "root-ca certificate" root-ca.crt
+    remove_file_if_it_exists "intermediate-ca private key" intermediate-ca.key
+    remove_file_if_it_exists "intermediate-ca certificate" intermediate-ca.crt
 }
 
 function create_private_key_and_self_signed_cert ()
 {
-    role=$1
+    file_base=$1
     common_name=$2
     run_command "openssl \
                     req \
                     -newkey rsa:2048 \
                     -nodes \
-                    -keyout ${role}.key \
+                    -keyout ${file_base}.key \
                     -x509 \
-                    -subj /C=US/ST=WA/L=Seattle/O=RemoteAutonomy/CN=${common_name} \
-                    -out ${role}.crt" \
-                "Could not create ${role} private key and self-signed certificate"
-    echo "Created ${role} private key file: ${role}.key"
-    echo "Created ${role} self-signed certificate file: ${role}.crt"
+                    -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION}/CN=${common_name} \
+                    -out ${file_base}.crt" \
+                "Could not create ${file_base} private key and self-signed certificate"
+    echo "Created ${file_base} private key file: ${file_base}.key"
+    echo "Created ${file_base} self-signed certificate file: ${file_base}.crt"
 }
 
-function create_server_private_key_and_self_signed_cert ()
+function create_root_ca_private_key_and_cert ()
 {
+    create_private_key_and_self_signed_cert root-ca $ROOT_CA_COMMON_NAME
+}
+
+function create_intermediate_ca_private_key_and_cert ()
+{
+    # TODO
+}
+
+function create_server_private_key_and_cert ()
+{
+    # TODO: possibly signed by root or intermediate CA
     create_private_key_and_self_signed_cert server $SERVER_HOST
 }
 
-function create_client_private_key_and_self_signed_cert ()
+function create_client_private_key_and_cert ()
 {
+    # TODO: possibly signed by root or intermediate CA
     create_private_key_and_self_signed_cert client $CLIENT_HOST
 }
 
@@ -169,9 +189,18 @@ remove_old_keys_and_certificates
 if [[ $CLEAN == $TRUE ]]; then
     exit 0
 fi
-if [[ "$AUTHENTICATION" == "server" ]] || [[ "$AUTHENTICATION" == "mutual" ]]; then
-    create_server_private_key_and_self_signed_cert
+if [[ "$SIGNER" == "root-ca" ]] || [[ "$SIGNER" == "intermediate-ca" ]]; then
+    create_root_ca_private_key_and_cert
+fi
+if [[ "$SIGNER" == "intermediate-ca" ]]; then
+    create_intermediate_ca_private_key_and_cert
 fi
 if [[ "$AUTHENTICATION" == "mutual" ]]; then
-    create_client_private_key_and_self_signed_cert
+    create_client_private_key_and_cert
+fi
+if [[ "$AUTHENTICATION" == "server" ]] || [[ "$AUTHENTICATION" == "mutual" ]]; then
+    create_server_private_key_and_cert
+fi
+if [[ "$AUTHENTICATION" == "mutual" ]]; then
+    create_client_private_key_and_cert
 fi
