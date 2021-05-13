@@ -219,14 +219,28 @@ function create_intermediate_ca_private_key_and_cert ()
 
 function create_server_private_key_and_cert ()
 {
-    # TODO: possibly signed by root or intermediate CA
-    create_private_key_and_self_signed_cert server "$SERVER_HOST"
+    if [[ "$SIGNER" == "root-ca" ]]; then
+        create_private_key_and_ca_signed_cert server "$SERVER_HOST" root-ca
+    elif [[ "$SIGNER" == "intermediate-ca" ]]; then
+        create_private_key_and_ca_signed_cert server "$SERVER_HOST" intermediate-ca
+    elif [[ "$SIGNER" == "self" ]]; then
+        create_private_key_and_self_signed_cert server "$SERVER_HOST"
+    else
+        fatal_error "Unknown signer \"${SIGNER}\""
+    fi
 }
 
 function create_client_private_key_and_cert ()
 {
-    # TODO: possibly signed by root or intermediate CA
-    create_private_key_and_self_signed_cert client "$CLIENT_HOST"
+    if [[ "$SIGNER" == "root-ca" ]]; then
+        create_private_key_and_ca_signed_cert client "$CLIENT_HOST" root-ca
+    elif [[ "$SIGNER" == "intermediate-ca" ]]; then
+        create_private_key_and_ca_signed_cert client "$CLIENT_HOST" intermediate-ca
+    elif [[ "$SIGNER" == "self" ]]; then
+        create_private_key_and_self_signed_cert client "$CLIENT_HOST"
+    else
+        fatal_error "Unknown signer \"${SIGNER}\""
+    fi
 }
 
 parse_command_line_options $@
