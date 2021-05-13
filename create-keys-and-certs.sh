@@ -9,10 +9,11 @@ BLUE=$(tput setaf 4)
 BEEP=$(tput bel)
 
 AUTHENTICATION="none"
+CLEAN=${FALSE}
 CLIENT_HOST="localhost"
 SERVER_HOST="localhost"
 SERVER_PORT=50051
-CA_SIGNED=${FALSE}
+SIGNER="self"
 
 help ()
 {
@@ -32,10 +33,6 @@ help ()
     echo "      mutual: the client and the server mutually authenticate each other."
     echo "      (Default: none)"
     echo
-    echo "  --ca-signed, -a"
-    echo "      Use Certificate Authority (CA) signed certificates (default: use self-signed"
-    echo "      certificates)"
-    echo
     echo "  --client-host, -c"
     echo "      The client hostname. Default: localhost."
     echo
@@ -44,6 +41,10 @@ help ()
     echo
     echo "  --server-port, -p"
     echo "      The server port number. Default: 50051."
+    echo
+    echo "  --signer, -i"
+    echo "      Use Certificate Authority (CA) signed certificates (default: use self-signed"
+    echo "      certificates)"
     echo
     echo "  -x, --clean"
     echo "      Remove all private key and certificate files."
@@ -74,6 +75,9 @@ parse_command_line_options ()
                       fatal_error "Unknown authentication \"$AUTHENTICATION\". Use none, server, or mutual"
                 fi
                 ;;
+            --clean|-x)
+                CLEAN=${TRUE}
+                ;;
             --client-host|-c)
                 CLIENT_HOST="$2"
                 shift
@@ -86,8 +90,14 @@ parse_command_line_options ()
                 SERVER_PORT="$2"
                 shift
                 ;;
-            --clean|-x)
-                CLEAN=${TRUE}
+            --signer|-i)
+                SIGNER="$2"
+                shift
+                if [[ "${SIGNER}" != "self" ]] && \
+                   [[ "${SIGNER}" != "root-ca" ]] && \
+                   [[ "${SIGNER}" != "intermediate-ca" ]]; then
+                      fatal_error "Unknown signer \"$SIGNER\". Use self, root-ca, or intermediate-ca"
+                fi
                 ;;
             *)
                 fatal_error "Unknown parameter passed: $1"
@@ -156,6 +166,9 @@ function create_client_private_key_and_self_signed_cert ()
 
 parse_command_line_options $@
 remove_old_keys_and_certificates
+if [[ $CLEAN == $TRUE ]]; then
+    exit 0
+fi
 if [[ "$AUTHENTICATION" == "server" ]] || [[ "$AUTHENTICATION" == "mutual" ]]; then
     create_server_private_key_and_self_signed_cert
 fi

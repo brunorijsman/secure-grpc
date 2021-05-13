@@ -9,12 +9,6 @@ def parse_command_line_arguments(role):
         default="none",
         help="Authentication: none, server, or mutual (default: none)")
     parser.add_argument(
-        "--ca-signed", "-r",
-        action="store_true",
-        default=False,
-        help=("Use certificate authority (CA) signed certificates (default: use self-signed "
-              "certificates)"))
-    parser.add_argument(
         "--client-host", "-c",
         type=str,
         default="localhost",
@@ -29,5 +23,12 @@ def parse_command_line_arguments(role):
         type=int,
         default=50051,
         help="The server port (default: 50051)")
+    parser.add_argument(
+        "--signer", "-i",
+        type=str,
+        choices=["self", "root-ca", "intermediate-ca"],
+        default="self",
+        help=("Signer for server and client certificates: self, root-CA, or intermediate-CA "
+              "(default: self)"))
     args = parser.parse_args()
     return args
