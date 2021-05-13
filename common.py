@@ -1,5 +1,4 @@
 import argparse
-import sys
 
 def parse_command_line_arguments(role):
     parser = argparse.ArgumentParser(description=f"Secure gRPC demo {role}")

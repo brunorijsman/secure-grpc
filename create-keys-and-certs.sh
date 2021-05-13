@@ -3,9 +3,13 @@
 FALSE=0
 TRUE=1
 
-CLIENT_AUTHENTICATED=${FALSE}
+NORMAL=$(tput sgr0)
+RED=$(tput setaf 1)
+BLUE=$(tput setaf 4)
+BEEP=$(tput bel)
+
+AUTHENTICATION="none"
 CLIENT_HOST="localhost"
-SERVER_AUTHENTICATED=${FALSE}
 SERVER_HOST="localhost"
 SERVER_PORT=50051
 CA_SIGNED=${FALSE}
@@ -22,20 +26,18 @@ help ()
     echo "  --help, -h, -?"
     echo "      Print this help and exit"
     echo
+    echo "  --authentication {none, server, mutual}, -A {none, server, mutual}"
+    echo "      none: no authentication."
+    echo "      server: the client authenticates the server."
+    echo "      mutual: the client and the server mutually authenticate each other."
+    echo "      (Default: none)"
+    echo
     echo "  --ca-signed, -a"
     echo "      Use Certificate Authority (CA) signed certificates (default: use self-signed"
     echo "      certificates)"
     echo
-    echo "  --client-authenticated, -C"
-    echo "      Client is authenticated by the server: generate a private key file client.key and"
-    echo "      a certificate file client.crt for the client. Default: client is not authenticated."
-    echo
     echo "  --client-host, -c"
     echo "      The client hostname. Default: localhost."
-    echo
-    echo "  --server-authenticated, -S"
-    echo "      Server is authenticated by the client: generate a private key file server.key and"
-    echo "      a certificate file server.crt for the server. Default: client is not authenticated."
     echo
     echo "  --server-host, -s"
     echo "      The server hostname. Default: localhost."
@@ -49,22 +51,32 @@ help ()
     exit 0
 }
 
+fatal_error ()
+{
+    message="$1"
+    echo "${RED}Error:${NORMAL} ${message}" >&2
+    exit 1
+}
+
 parse_command_line_options ()
 {
     while [[ "$#" -gt 0 ]]; do
         case $1 in
-            --help|-h|-?)
+            --help|-h|-\?)
                 help
                 ;;
-            --client-authenticated|-C)
-                CLIENT_AUTHENTICATED=${TRUE}
+            --authentication|-A)
+                AUTHENTICATION="$2"
+                shift
+                if [[ "${AUTHENTICATION}" != "none" ]] && \
+                   [[ "${AUTHENTICATION}" != "server" ]] && \
+                   [[ "${AUTHENTICATION}" != "mutual" ]]; then
+                      fatal_error "Unknown authentication \"$AUTHENTICATION\". Use none, server, or mutual"
+                fi
                 ;;
             --client-host|-c)
                 CLIENT_HOST="$2"
                 shift
-                ;;
-            --server-authenticated|-S)
-                SERVER_AUTHENTICATED=${TRUE}
                 ;;
             --server-host|-s)
                 SERVER_HOST="$2"
@@ -144,5 +156,9 @@ function create_client_private_key_and_self_signed_cert ()
 
 parse_command_line_options $@
 remove_old_keys_and_certificates
-create_server_private_key_and_self_signed_cert
-create_client_private_key_and_self_signed_cert
+if [[ "$AUTHENTICATION" == "server" ]] || [[ "$AUTHENTICATION" == "mutual" ]]; then
+    create_server_private_key_and_self_signed_cert
+fi
+if [[ "$AUTHENTICATION" == "mutual" ]]; then
+    create_client_private_key_and_self_signed_cert
+fi
