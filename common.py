@@ -3,7 +3,7 @@ import argparse
 def parse_command_line_arguments(role):
     parser = argparse.ArgumentParser(description=f"Secure gRPC demo {role}")
     parser.add_argument(
-        "--authentication", "-A",
+        "--authentication", "-a",
         type=str,
         choices=["none", "server", "mutual"],
         default="none",

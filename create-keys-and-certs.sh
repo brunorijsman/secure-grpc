@@ -15,10 +15,17 @@ SERVER_HOST="localhost"
 SERVER_PORT=50051
 SIGNER="self"
 
-DAYS_VALID=3650
+# TODO: Put country etc. in variables
 ORGANIZATION="Example-Corp"
 ROOT_CA_COMMON_NAME="${ORGANIZATION}-Root-Certificate-Authority"
 INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION}-Intermediate-Certificate-Authority"
+DAYS_VALID=3650
+
+# TODO: Support subject alternative names (SAN)
+# See https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/ for
+# instructions on how to use config files to achieve that.
+
+# TODO: Add support for -extfile
 
 function help ()
 {
@@ -32,7 +39,7 @@ function help ()
     echo "  --help, -h, -?"
     echo "      Print this help and exit"
     echo
-    echo "  --authentication {none, server, mutual}, -A {none, server, mutual}"
+    echo "  --authentication {none, server, mutual}, -a {none, server, mutual}"
     echo "      none: no authentication."
     echo "      server: the client authenticates the server."
     echo "      mutual: the client and the server mutually authenticate each other."
@@ -73,7 +80,7 @@ function parse_command_line_options ()
             --help|-h|-\?)
                 help
                 ;;
-            --authentication|-A)
+            --authentication|-a)
                 AUTHENTICATION="$2"
                 shift
                 if [[ "${AUTHENTICATION}" != "none" ]] && \
@@ -144,7 +151,9 @@ function remove_old_keys_and_certificates ()
     remove_file_if_it_exists "client certificate" client.crt
     remove_file_if_it_exists "root-ca private key" root-ca.key
     remove_file_if_it_exists "root-ca certificate" root-ca.crt
+    remove_file_if_it_exists "root-ca serial" root-ca.srl
     remove_file_if_it_exists "intermediate-ca private key" intermediate-ca.key
+    remove_file_if_it_exists "intermediate-ca certificate signing request" intermediate-ca.csr
     remove_file_if_it_exists "intermediate-ca certificate" intermediate-ca.crt
 }
 
@@ -166,6 +175,38 @@ function create_private_key_and_self_signed_cert ()
     echo "Created ${file_base} self-signed certificate file: ${file_base}.crt"
 }
 
+function create_private_key_and_ca_signed_cert ()
+{
+    file_base="$1"
+    common_name="$2"
+    signing_ca="$3"
+    signing_ca_certificate="${signing_ca}.crt"
+    signing_ca_private_key="${signing_ca}.key"
+    # Create the private key (.key) and certificate signing request (.csr)
+    run_command "openssl \
+                    req \
+                    -newkey rsa:2048 \
+                    -nodes \
+                    -keyout ${file_base}.key \
+                    -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION}/CN=${common_name} \
+                    -out ${file_base}.csr" \
+                "Could not create ${file_base} private key and certificate signing request"
+    echo "Created ${file_base} private key file: ${file_base}.key"
+    echo "Created ${file_base} certificate signing request file: ${file_base}.csr"
+    # Create the CA-signed certificate
+    run_command "openssl \
+                    x509 \
+                    -req \
+                    -in ${file_base}.csr \
+                    -CA ${signing_ca_certificate} \
+                    -CAkey ${signing_ca_private_key} \
+                    -CAcreateserial \
+                    -days ${DAYS_VALID} \
+                    -out ${file_base}.crt" \
+                "Could not create ${file_base} certificate"
+    echo "Created ${file_base} certificate file: ${file_base}.crt"
+}
+
 function create_root_ca_private_key_and_cert ()
 {
     create_private_key_and_self_signed_cert root-ca "$ROOT_CA_COMMON_NAME"
@@ -173,7 +214,7 @@ function create_root_ca_private_key_and_cert ()
 
 function create_intermediate_ca_private_key_and_cert ()
 {
-    echo "Not implemented yet" # TODO
+    create_private_key_and_ca_signed_cert intermediate-ca "$INTERMEDIATE_CA_COMMON_NAME" root-ca
 }
 
 function create_server_private_key_and_cert ()
