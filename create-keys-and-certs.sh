@@ -11,15 +11,15 @@ BEEP=$(tput bel)
 AUTHENTICATION="none"
 CLEAN=${FALSE}
 CLIENT_HOST="localhost"
-ORGANIZATION="Example Corp"  # TODO: Make this configurable
 SERVER_HOST="localhost"
 SERVER_PORT=50051
 SIGNER="self"
 
-ROOT_CA_COMMON_NAME="${ORGANIZATION} Root Certificate Authority"
-INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION} Intermediate Certificate Authority"
+ORGANIZATION="Example-Corp"
+ROOT_CA_COMMON_NAME="${ORGANIZATION}-Root-Certificate-Authority"
+INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION}-Intermediate-Certificate-Authority"
 
-help ()
+function help ()
 {
     echo
     echo "SYNOPSIS"
@@ -56,14 +56,14 @@ help ()
     exit 0
 }
 
-fatal_error ()
+function fatal_error ()
 {
     message="$1"
     echo "${RED}Error:${NORMAL} ${message}" >&2
     exit 1
 }
 
-parse_command_line_options ()
+function parse_command_line_options ()
 {
     while [[ "$#" -gt 0 ]]; do
         case $1 in
@@ -147,8 +147,8 @@ function remove_old_keys_and_certificates ()
 
 function create_private_key_and_self_signed_cert ()
 {
-    file_base=$1
-    common_name=$2
+    file_base="$1"
+    common_name="$2"
     run_command "openssl \
                     req \
                     -newkey rsa:2048 \
@@ -164,24 +164,24 @@ function create_private_key_and_self_signed_cert ()
 
 function create_root_ca_private_key_and_cert ()
 {
-    create_private_key_and_self_signed_cert root-ca $ROOT_CA_COMMON_NAME
+    create_private_key_and_self_signed_cert root-ca "$ROOT_CA_COMMON_NAME"
 }
 
 function create_intermediate_ca_private_key_and_cert ()
 {
-    # TODO
+    echo "Not implemented yet" # TODO
 }
 
 function create_server_private_key_and_cert ()
 {
     # TODO: possibly signed by root or intermediate CA
-    create_private_key_and_self_signed_cert server $SERVER_HOST
+    create_private_key_and_self_signed_cert server "$SERVER_HOST"
 }
 
 function create_client_private_key_and_cert ()
 {
     # TODO: possibly signed by root or intermediate CA
-    create_private_key_and_self_signed_cert client $CLIENT_HOST
+    create_private_key_and_self_signed_cert client "$CLIENT_HOST"
 }
 
 parse_command_line_options $@
@@ -200,7 +200,4 @@ if [[ "$AUTHENTICATION" == "mutual" ]]; then
 fi
 if [[ "$AUTHENTICATION" == "server" ]] || [[ "$AUTHENTICATION" == "mutual" ]]; then
     create_server_private_key_and_cert
-fi
-if [[ "$AUTHENTICATION" == "mutual" ]]; then
-    create_client_private_key_and_cert
 fi
