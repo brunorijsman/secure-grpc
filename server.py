@@ -13,6 +13,29 @@ class Adder(adder_pb2_grpc.AdderServicer):
         print(f"Server: {request.a} + {request.b} = {reply.sum}")
         return reply
 
+def make_credentials(args):
+    assert args.authentication in ["server", "mutual"]
+    assert args.signer in ["self", "root-ca", "intermediate-ca"]
+    server_private_key = open("server.key", "br").read()
+    server_certificate = open("server.crt", "br").read()
+    private_key_certificate_chain_pairs = [(server_private_key, server_certificate)]
+    if args.authentication == "mutual":
+        if args.signer == "self":
+            print("Mutual self-signed authentication")
+            root_certificate = open("client.crt", "br").read()
+        elif args.signer == "root-ca":
+            print("Mutual root CA signed authentication")
+            root_certificate = open("root-ca.crt", "br").read()
+        else:
+            print("Mutual intermediate CA signed authentication")
+            root_certificate = open("intermediate-ca.crt", "br").read()
+    else:
+        print("Server authentication")
+        root_certificate = None
+    credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs,
+                                              root_certificate, True)
+    return credentials
+
 async def main():
     args = parse_command_line_arguments("server")
     server = grpc.aio.server()
@@ -20,19 +43,8 @@ async def main():
     if args.authentication == "none":
         print("No authentication")
         server.add_insecure_port(server_address)
-    elif args.authentication == "server":
-        print("Server authentication")
-        server_private_key = open("server.key", "br").read()
-        server_certificate = open("server.crt", "br").read()
-        credentials = grpc.ssl_server_credentials([(server_private_key, server_certificate)])
-        server.add_secure_port(server_address, credentials)
-    elif args.authentication == "mutual":
-        print("Mutual authentication")
-        server_private_key = open("server.key", "br").read()
-        server_certificate = open("server.crt", "br").read()
-        client_certificate = open("client.crt", "br").read()
-        credentials = grpc.ssl_server_credentials([(server_private_key, server_certificate)],
-                                                  client_certificate, True)
+    else:
+        credentials = make_credentials(args)
         server.add_secure_port(server_address, credentials)
     adder_pb2_grpc.add_AdderServicer_to_server(Adder(), server)
     await server.start()
