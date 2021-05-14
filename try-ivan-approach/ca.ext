@@ -1,0 +1,4 @@
+[ default ]
+basicConstraints = critical,CA:true     # recommended to be marked critical. required for a ca
+keyUsage         = critical,keyCertSign # required to be marked critical. required for signing certs
+
