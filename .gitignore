@@ -143,3 +143,6 @@ dmypy.json
 
 # Serial files
 *.srl
+
+# PEM files
+*.pem
