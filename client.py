@@ -5,26 +5,34 @@ import random
 import grpc
 import adder_pb2
 import adder_pb2_grpc
-from common import parse_command_line_arguments
+import common
 
-async def main():
-    args = parse_command_line_arguments("server")
-    server_address = f"{args.server_host}:{args.server_port}"
-    if args.authentication == "none":
-        print("No authentication")
-        channel = grpc.aio.insecure_channel(server_address)
-    elif args.authentication == "server":
-        print("Server authentication")
-        server_certificate = open("server.crt", "br").read()
-        credentials = grpc.ssl_channel_credentials(server_certificate)
-        channel = grpc.aio.secure_channel(server_address, credentials)
-    elif args.authentication == "mutual":
-        print("Mutual authentication")
-        server_certificate = open("server.crt", "br").read()
+def make_credentials(args):
+    assert args.authentication in ["server", "mutual"]
+    assert args.signer in ["self", "root", "intermediate"]
+    if args.signer == "self":
+        root_certificate_for_server = open("server.crt", "br").read()
+    elif args.signer == "root":
+        root_certificate_for_server = open("root.crt", "br").read()
+    else:
+        root_certificate_for_server = open("intermediate.crt", "br").read()
+    if args.authentication == "mutual":
         client_private_key = open("client.key", "br").read()
         client_certificate = open("client.crt", "br").read()
-        credentials = grpc.ssl_channel_credentials(server_certificate, client_private_key,
+        credentials = grpc.ssl_channel_credentials(root_certificate_for_server, client_private_key,
                                                    client_certificate)
+    else:
+        credentials = grpc.ssl_channel_credentials(root_certificate_for_server)
+    return credentials
+
+async def main():
+    args = common.parse_command_line_arguments("server")
+    print(common.authentication_and_signer_summary(args))
+    server_address = f"{args.server_host}:{args.server_port}"
+    if args.authentication == "none":
+        channel = grpc.aio.insecure_channel(server_address)
+    else:
+        credentials = make_credentials(args)
         channel = grpc.aio.secure_channel(server_address, credentials)
     stub = adder_pb2_grpc.AdderStub(channel)
     print(f"Connecting to server on {server_address}")

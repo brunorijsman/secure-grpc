@@ -32,3 +32,17 @@ def parse_command_line_arguments(role):
               "(default: self)"))
     args = parser.parse_args()
     return args
+
+def authentication_and_signer_summary(args):
+    assert args.authentication in ["server", "mutual"]
+    assert args.signer in ["self", "root", "intermediate"]
+    if args.authentication == "none":
+        return "No authentication"
+    assert args.authentication in ["server", "mutual"]
+    if args.signer == "self":
+        signer_str = "self-signed"
+    elif args.signer == "intermediate":
+        signer_str = "intermediate CA signed"
+    else:
+        signer_str = "root CA signed"
+    return f"{args.authentication.capitalize()} {signer_str} authentication"

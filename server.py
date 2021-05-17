@@ -4,7 +4,7 @@ import asyncio
 import grpc
 import adder_pb2
 import adder_pb2_grpc
-from common import parse_command_line_arguments
+import common
 
 class Adder(adder_pb2_grpc.AdderServicer):
 
@@ -21,23 +21,20 @@ def make_credentials(args):
     private_key_certificate_chain_pairs = [(server_private_key, server_certificate)]
     if args.authentication == "mutual":
         if args.signer == "self":
-            print("Mutual self-signed authentication")
-            root_certificate = open("client.crt", "br").read()
+            root_certificate_for_client = open("client.crt", "br").read()
         elif args.signer == "root":
-            print("Mutual root CA signed authentication")
-            root_certificate = open("root.crt", "br").read()
+            root_certificate_for_client = open("root.crt", "br").read()
         else:
-            print("Mutual intermediate CA signed authentication")
-            root_certificate = open("intermediate.crt", "br").read()
+            root_certificate_for_client = open("intermediate.crt", "br").read()
     else:
-        print("Server authentication")
-        root_certificate = None
+        root_certificate_for_client = None
     credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs,
-                                              root_certificate, True)
+                                              root_certificate_for_client, True)
     return credentials
 
 async def main():
-    args = parse_command_line_arguments("server")
+    args = common.parse_command_line_arguments("server")
+    print(common.authentication_and_signer_summary(args))
     server = grpc.aio.server()
     server_address = f"{args.server_host}:{args.server_port}"
     if args.authentication == "none":
