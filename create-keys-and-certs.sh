@@ -19,6 +19,7 @@ ORGANIZATION="Example Corp"
 ROOT_CA_COMMON_NAME="${ORGANIZATION} Root Certificate Authority"
 INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION} Intermediate Certificate Authority"
 ROOT_DAYS=1095
+INTERMEDIATE_DAYS=730
 
 # TODO: Support subject alternative names (SAN)
 # See https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/ for
@@ -143,10 +144,11 @@ function create_root_private_key ()
                     -out keys/root.key \
                     2048" \
                 "Could not create root private key"
+
     echo "Created root private key"
 }
 
-function create_root_req_config ()
+function create_root_certificate_signing_request ()
 {
     {
         echo "[req]"
@@ -157,17 +159,14 @@ function create_root_req_config ()
         echo "countryName = US"
         echo "commonName  = $ROOT_CA_COMMON_NAME"
     } >admin/root_req.config
-}
 
-function create_root_certificate_signing_request ()
-{
-    create_root_req_config
     run_command "openssl req \
                     -new \
                     -key keys/root.key \
                     -out admin/root.csr \
                     -config admin/root_req.config" \
                 "Could not create root certificate signing request"
+
     echo "Created root certificate signing request"
 }
 
@@ -207,7 +206,7 @@ function create_root_certificate ()
         echo "[default]"
         echo "basicConstraints = critical,CA:true"
         echo "keyUsage         = critical,keyCertSign"
-    } >admin/root.ext
+    } >admin/ca.ext
 
     run_command "openssl ca \
                     -batch \
@@ -215,11 +214,66 @@ function create_root_certificate ()
                     -out certs/root.crt \
                     -config admin/root.config \
                     -selfsign \
-                    -extfile admin/root.ext \
+                    -extfile admin/ca.ext \
                     -days $ROOT_DAYS" \
                 "Could not create root certificate"
 
     echo "Created root certificate"
+}
+
+function create_intermediate_private_key ()
+{
+    run_command "openssl genrsa \
+                    -out keys/intermediate.key \
+                    2048" \
+                "Could not create intermediate private key"
+
+    echo "Created intermediate private key"
+}
+
+function create_intermediate_certificate_signing_request ()
+{
+    {
+        echo "[req]"
+        echo "distinguished_name = req_distinguished_name"
+        echo "prompt             = no"
+        echo
+        echo "[req_distinguished_name]"
+        echo "countryName = US"
+        echo "commonName  = $INTERMEDIATE_CA_COMMON_NAME"
+    } >admin/intermediate_req.config
+
+    run_command "openssl req \
+                    -new \
+                    -key keys/intermediate.key \
+                    -out admin/intermediate.csr \
+                    -config admin/intermediate_req.config" \
+                "Could not create intermediate certificate signing request"
+
+    echo "Created intermediate certificate signing request"
+}
+
+function create_intermediate_certificate ()
+{
+    touch admin/intermediate.db
+
+    touch admin/intermediate.index
+
+    echo "00" >admin/intermediate.serial
+
+    # Root certificate is always create before intermediate certificate; we can safely assume that
+    # root.config and ca.ext have already been created.
+
+    run_command "openssl ca \
+                    -batch \
+                    -in admin/intermediate.csr \
+                    -out certs/intermediate.crt \
+                    -config admin/root.config \
+                    -extfile admin/ca.ext \
+                    -days $INTERMEDIATE_DAYS" \
+                "Could not create intermediate certificate"
+
+    echo "Created intermediate certificate"
 }
 
 function create_private_key_and_self_signed_cert ()
@@ -331,3 +385,6 @@ create_root_private_key
 create_root_certificate_signing_request
 create_root_certificate
 
+create_intermediate_private_key
+create_intermediate_certificate_signing_request
+create_intermediate_certificate
