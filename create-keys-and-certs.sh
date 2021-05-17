@@ -15,10 +15,10 @@ SERVER_HOST="localhost"
 SIGNER="self"
 
 # TODO: Put country etc. in variables
-ORGANIZATION="Example-Corp"
-ROOT_CA_COMMON_NAME="${ORGANIZATION}-Root-Certificate-Authority"
-INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION}-Intermediate-Certificate-Authority"
-DAYS_VALID=3650
+ORGANIZATION="Example Corp"
+ROOT_CA_COMMON_NAME="${ORGANIZATION} Root Certificate Authority"
+INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION} Intermediate Certificate Authority"
+ROOT_DAYS=1095
 
 # TODO: Support subject alternative names (SAN)
 # See https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/ for
@@ -132,6 +132,94 @@ function empty_keys_and_certs_dirs ()
     mkdir keys
     rm -rf certs
     mkdir certs
+    rm -rf admin
+    mkdir admin
+
+}
+
+function create_root_private_key ()
+{
+    run_command "openssl genrsa \
+                    -out keys/root.key \
+                    2048" \
+                "Could not create root private key"
+    echo "Created root private key"
+}
+
+function create_root_req_config ()
+{
+    {
+        echo "[req]"
+        echo "distinguished_name = req_distinguished_name"
+        echo "prompt             = no"
+        echo
+        echo "[req_distinguished_name]"
+        echo "countryName = US"
+        echo "commonName  = $ROOT_CA_COMMON_NAME"
+    } >admin/root_req.config
+}
+
+function create_root_certificate_signing_request ()
+{
+    create_root_req_config
+    run_command "openssl req \
+                    -new \
+                    -key keys/root.key \
+                    -out admin/root.csr \
+                    -config admin/root_req.config" \
+                "Could not create root certificate signing request"
+    echo "Created root certificate signing request"
+}
+
+function create_root_certificate ()
+{
+    touch admin/root.db
+
+    touch admin/root.index
+
+    echo "00" >admin/root.serial
+
+    {
+        echo "[ca]"
+        echo "default_ca      = CA_default"
+        echo
+        echo "[CA_default]"
+        echo "database        = admin/root.db"
+        echo "new_certs_dir   = ./"
+        echo "certificate     = certs/root.crt"
+        echo "serial          = admin/root.serial"
+        echo "private_key     = keys/root.key"
+        echo "policy          = policy_any"
+        echo "email_in_dn     = no"
+        echo "unique_subject  = no"
+        echo "copy_extensions = none"
+        echo "default_md      = sha256"
+        echo
+        echo "[policy_any]"
+        echo "countryName            = optional"
+        echo "stateOrProvinceName    = optional"
+        echo "organizationName       = optional"
+        echo "organizationalUnitName = optional"
+        echo "commonName             = supplied"
+    } >admin/root.config
+
+    {
+        echo "[default]"
+        echo "basicConstraints = critical,CA:true"
+        echo "keyUsage         = critical,keyCertSign"
+    } >admin/root.ext
+
+    run_command "openssl ca \
+                    -batch \
+                    -in admin/root.csr \
+                    -out certs/root.crt \
+                    -config admin/root.config \
+                    -selfsign \
+                    -extfile admin/root.ext \
+                    -days $ROOT_DAYS" \
+                "Could not create root certificate"
+
+    echo "Created root certificate"
 }
 
 function create_private_key_and_self_signed_cert ()
@@ -222,18 +310,24 @@ function create_client_private_key_and_cert ()
 
 parse_command_line_options $@
 empty_keys_and_certs_dirs
-if [[ $CLEAN == $TRUE ]]; then
-    exit 0
-fi
-if [[ "$SIGNER" == "root" ]] || [[ "$SIGNER" == "intermediate" ]]; then
-    create_root_ca_private_key_and_cert
-fi
-if [[ "$SIGNER" == "intermediate" ]]; then
-    create_intermediate_ca_private_key_and_cert
-fi
-if [[ "$AUTHENTICATION" == "mutual" ]]; then
-    create_client_private_key_and_cert
-fi
-if [[ "$AUTHENTICATION" == "server" ]] || [[ "$AUTHENTICATION" == "mutual" ]]; then
-    create_server_private_key_and_cert
-fi
+
+# if [[ $CLEAN == $TRUE ]]; then
+#     exit 0
+# fi
+# if [[ "$SIGNER" == "root" ]] || [[ "$SIGNER" == "intermediate" ]]; then
+#     create_root_ca_private_key_and_cert
+# fi
+# if [[ "$SIGNER" == "intermediate" ]]; then
+#     create_intermediate_ca_private_key_and_cert
+# fi
+# if [[ "$AUTHENTICATION" == "mutual" ]]; then
+#     create_client_private_key_and_cert
+# fi
+# if [[ "$AUTHENTICATION" == "server" ]] || [[ "$AUTHENTICATION" == "mutual" ]]; then
+#     create_server_private_key_and_cert
+# fi
+
+create_root_private_key
+create_root_certificate_signing_request
+create_root_certificate
+

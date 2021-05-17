@@ -132,17 +132,11 @@ dmypy.json
 *_pb2.py
 *_grpc.py
 
-# Private keys
+# Private keys, certificates, certificates signing requests, and associated admin files
 *.key
-
-# Certificate signing requests
 *.csr
-
-# Certificates
 *.crt
-
-# Serial files
-*.srl
-
-# PEM files
 *.pem
+keys/*
+certs/*
+admin/*
