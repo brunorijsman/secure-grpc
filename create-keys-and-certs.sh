@@ -12,7 +12,6 @@ AUTHENTICATION="none"
 CLEAN=${FALSE}
 CLIENT_HOST="localhost"
 SERVER_HOST="localhost"
-SERVER_PORT=50051
 SIGNER="self"
 
 # TODO: Put country etc. in variables
@@ -51,13 +50,10 @@ function help ()
     echo "  --server-host, -s"
     echo "      The server hostname. Default: localhost."
     echo
-    echo "  --server-port, -p"
-    echo "      The server port number. Default: 50051."
-    echo
-    echo "  --signer {self, root-ca, intermediate-ca}, -i {self, root-ca, intermediate-ca}"
+    echo "  --signer {self, root, intermediate}, -i {self, root, intermediate}"
     echo "      self: server and client certificates are self-signed."
-    echo "      root-ca: server and client certificates are signed by the root CA."
-    echo "      intermediate-ca: server and client certificates are signed by an intermediate CA."
+    echo "      root: server and client certificates are signed by the root CA."
+    echo "      intermediate: server and client certificates are signed by an intermediate CA."
     echo "      (Default: self)"
     echo
     echo "  -x, --clean"
@@ -100,17 +96,13 @@ function parse_command_line_options ()
                 SERVER_HOST="$2"
                 shift
                 ;;
-            --server-port|-p)
-                SERVER_PORT="$2"
-                shift
-                ;;
             --signer|-i)
                 SIGNER="$2"
                 shift
                 if [[ "${SIGNER}" != "self" ]] && \
-                   [[ "${SIGNER}" != "root-ca" ]] && \
-                   [[ "${SIGNER}" != "intermediate-ca" ]]; then
-                      fatal_error "Unknown signer \"$SIGNER\". Use self, root-ca, or intermediate-ca"
+                   [[ "${SIGNER}" != "root" ]] && \
+                   [[ "${SIGNER}" != "intermediate" ]]; then
+                      fatal_error "Unknown signer \"$SIGNER\". Use self, root, or intermediate"
                 fi
                 ;;
             *)
@@ -134,27 +126,12 @@ function run_command ()
     fi
 }
 
-function remove_file_if_it_exists ()
+function empty_keys_and_certs_dirs ()
 {
-    description=$1
-    file=$2
-    if rm $file 2>/dev/null; then
-        echo "Removed old ${description} file: ${file}"
-    fi
-}
-
-function remove_old_keys_and_certificates ()
-{
-    remove_file_if_it_exists "server private key" server.key
-    remove_file_if_it_exists "server certificate" server.crt
-    remove_file_if_it_exists "client private key" client.key
-    remove_file_if_it_exists "client certificate" client.crt
-    remove_file_if_it_exists "root-ca private key" root-ca.key
-    remove_file_if_it_exists "root-ca certificate" root-ca.crt
-    remove_file_if_it_exists "root-ca serial" root-ca.srl
-    remove_file_if_it_exists "intermediate-ca private key" intermediate-ca.key
-    remove_file_if_it_exists "intermediate-ca certificate signing request" intermediate-ca.csr
-    remove_file_if_it_exists "intermediate-ca certificate" intermediate-ca.crt
+    rm -rf keys
+    mkdir keys
+    rm -rf certs
+    mkdir certs
 }
 
 function create_private_key_and_self_signed_cert ()
@@ -165,11 +142,11 @@ function create_private_key_and_self_signed_cert ()
                     req \
                     -newkey rsa:2048 \
                     -nodes \
-                    -keyout ${file_base}.key \
+                    -keyout keys/${file_base}.key \
                     -x509 \
                     -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION}/CN=${common_name} \
                     -days ${DAYS_VALID} \
-                    -out ${file_base}.crt" \
+                    -out certs/${file_base}.crt" \
                 "Could not create ${file_base} private key and self-signed certificate"
     echo "Created ${file_base} private key file: ${file_base}.key"
     echo "Created ${file_base} self-signed certificate file: ${file_base}.crt"
@@ -187,9 +164,9 @@ function create_private_key_and_ca_signed_cert ()
                     req \
                     -newkey rsa:2048 \
                     -nodes \
-                    -keyout ${file_base}.key \
+                    -keyout keys/${file_base}.key \
                     -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION}/CN=${common_name} \
-                    -out ${file_base}.csr" \
+                    -out certs/${file_base}.csr" \
                 "Could not create ${file_base} private key and certificate signing request"
     echo "Created ${file_base} private key file: ${file_base}.key"
     echo "Created ${file_base} certificate signing request file: ${file_base}.csr"
@@ -197,32 +174,32 @@ function create_private_key_and_ca_signed_cert ()
     run_command "openssl \
                     x509 \
                     -req \
-                    -in ${file_base}.csr \
-                    -CA ${signing_ca_certificate} \
-                    -CAkey ${signing_ca_private_key} \
+                    -in certs/${file_base}.csr \
+                    -CA certs/${signing_ca_certificate} \
+                    -CAkey keys/${signing_ca_private_key} \
                     -CAcreateserial \
                     -days ${DAYS_VALID} \
-                    -out ${file_base}.crt" \
+                    -out certs/${file_base}.crt" \
                 "Could not create ${file_base} certificate"
     echo "Created ${file_base} certificate file: ${file_base}.crt"
 }
 
 function create_root_ca_private_key_and_cert ()
 {
-    create_private_key_and_self_signed_cert root-ca "$ROOT_CA_COMMON_NAME"
+    create_private_key_and_self_signed_cert root "$ROOT_CA_COMMON_NAME"
 }
 
 function create_intermediate_ca_private_key_and_cert ()
 {
-    create_private_key_and_ca_signed_cert intermediate-ca "$INTERMEDIATE_CA_COMMON_NAME" root-ca
+    create_private_key_and_ca_signed_cert intermediate "$INTERMEDIATE_CA_COMMON_NAME" root
 }
 
 function create_server_private_key_and_cert ()
 {
-    if [[ "$SIGNER" == "root-ca" ]]; then
-        create_private_key_and_ca_signed_cert server "$SERVER_HOST" root-ca
-    elif [[ "$SIGNER" == "intermediate-ca" ]]; then
-        create_private_key_and_ca_signed_cert server "$SERVER_HOST" intermediate-ca
+    if [[ "$SIGNER" == "root" ]]; then
+        create_private_key_and_ca_signed_cert server "$SERVER_HOST" root
+    elif [[ "$SIGNER" == "intermediate" ]]; then
+        create_private_key_and_ca_signed_cert server "$SERVER_HOST" intermediate
     elif [[ "$SIGNER" == "self" ]]; then
         create_private_key_and_self_signed_cert server "$SERVER_HOST"
     else
@@ -232,10 +209,10 @@ function create_server_private_key_and_cert ()
 
 function create_client_private_key_and_cert ()
 {
-    if [[ "$SIGNER" == "root-ca" ]]; then
-        create_private_key_and_ca_signed_cert client "$CLIENT_HOST" root-ca
-    elif [[ "$SIGNER" == "intermediate-ca" ]]; then
-        create_private_key_and_ca_signed_cert client "$CLIENT_HOST" intermediate-ca
+    if [[ "$SIGNER" == "root" ]]; then
+        create_private_key_and_ca_signed_cert client "$CLIENT_HOST" root
+    elif [[ "$SIGNER" == "intermediate" ]]; then
+        create_private_key_and_ca_signed_cert client "$CLIENT_HOST" intermediate
     elif [[ "$SIGNER" == "self" ]]; then
         create_private_key_and_self_signed_cert client "$CLIENT_HOST"
     else
@@ -244,14 +221,14 @@ function create_client_private_key_and_cert ()
 }
 
 parse_command_line_options $@
-remove_old_keys_and_certificates
+empty_keys_and_certs_dirs
 if [[ $CLEAN == $TRUE ]]; then
     exit 0
 fi
-if [[ "$SIGNER" == "root-ca" ]] || [[ "$SIGNER" == "intermediate-ca" ]]; then
+if [[ "$SIGNER" == "root" ]] || [[ "$SIGNER" == "intermediate" ]]; then
     create_root_ca_private_key_and_cert
 fi
-if [[ "$SIGNER" == "intermediate-ca" ]]; then
+if [[ "$SIGNER" == "intermediate" ]]; then
     create_intermediate_ca_private_key_and_cert
 fi
 if [[ "$AUTHENTICATION" == "mutual" ]]; then
