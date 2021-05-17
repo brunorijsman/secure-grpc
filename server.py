@@ -34,18 +34,17 @@ def make_credentials(args):
 
 async def main():
     args = common.parse_command_line_arguments("server")
-    print(common.authentication_and_signer_summary(args))
+    print(f"Server: {common.authentication_and_signer_summary(args)}")
     server = grpc.aio.server()
     server_address = f"{args.server_host}:{args.server_port}"
     if args.authentication == "none":
-        print("No authentication")
         server.add_insecure_port(server_address)
     else:
         credentials = make_credentials(args)
         server.add_secure_port(server_address, credentials)
     adder_pb2_grpc.add_AdderServicer_to_server(Adder(), server)
     await server.start()
-    print(f"Started server on {server_address}")
+    print(f"Server: listening on {server_address}")
     await server.wait_for_termination()
 
 if __name__ == "__main__":

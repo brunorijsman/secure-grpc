@@ -27,7 +27,7 @@ def make_credentials(args):
 
 async def main():
     args = common.parse_command_line_arguments("server")
-    print(common.authentication_and_signer_summary(args))
+    print(f"Client: {common.authentication_and_signer_summary(args)}")
     server_address = f"{args.server_host}:{args.server_port}"
     if args.authentication == "none":
         channel = grpc.aio.insecure_channel(server_address)
@@ -35,7 +35,7 @@ async def main():
         credentials = make_credentials(args)
         channel = grpc.aio.secure_channel(server_address, credentials)
     stub = adder_pb2_grpc.AdderStub(channel)
-    print(f"Connecting to server on {server_address}")
+    print(f"Client: connect to {server_address}")
     a = random.randint(1, 10001)
     b = random.randint(1, 10001)
     request = adder_pb2.AddRequest(a=a, b=b)

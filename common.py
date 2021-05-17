@@ -45,4 +45,4 @@ def authentication_and_signer_summary(args):
         signer_str = "intermediate CA signed"
     else:
         signer_str = "root CA signed"
-    return f"{args.authentication.capitalize()} {signer_str} authentication"
+    return f"{args.authentication} {signer_str} authentication"
