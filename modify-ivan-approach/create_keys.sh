@@ -14,6 +14,7 @@ openssl req \
 
 # create the root CA cert
 openssl ca \
+    -batch \
     -in root.csr \
     -out root.pem \
     -config root.config \
@@ -35,28 +36,30 @@ openssl req \
 
 # create the intermediate CA cert
 openssl ca \
+    -batch \
     -in intermediate.csr \
     -out intermediate.pem \
     -config root.config \
     -extfile ca.ext \
     -days 730
 
-# create the private key for the leaf certificate
+# create the private key for the client certificate
 openssl genrsa \
-    -out leaf.key \
+    -out client.key \
     2048
 
-# create the csr for the leaf certificate
+# create the csr for the client certificate
 openssl req \
     -new \
-    -key leaf.key \
-    -out leaf.csr \
-    -config leaf_req.config
+    -key client.key \
+    -out client.csr \
+    -config client_req.config
 
-# create the leaf certificate (note: no ca.ext. this certificate is not a CA)
+# create the client certificate (note: no ca.ext. this certificate is not a CA)
 openssl ca \
-    -in leaf.csr \
-    -out leaf.pem \
+    -batch \
+    -in client.csr \
+    -out client.pem \
     -config intermediate.config \
     -days 365
 
@@ -65,5 +68,34 @@ openssl verify \
     -x509_strict \
     -CAfile root.pem \
     -untrusted intermediate.pem \
-    leaf.pem
+    client.pem
+
+# create the private key for the server certificate
+openssl genrsa \
+    -out server.key \
+    2048
+
+# create the csr for the server certificate
+openssl req \
+    -new \
+    -key server.key \
+    -out server.csr \
+    -config server_req.config
+
+# create the server certificate (note: no ca.ext. this certificate is not a CA)
+openssl ca \
+    -batch \
+    -in server.csr \
+    -out server.pem \
+    -config intermediate.config \
+    -days 365
+
+# verify the certificate chain
+openssl verify \
+    -x509_strict \
+    -CAfile root.pem \
+    -untrusted intermediate.pem \
+    server.pem
+
+
 
