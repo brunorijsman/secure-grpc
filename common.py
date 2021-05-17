@@ -26,9 +26,9 @@ def parse_command_line_arguments(role):
     parser.add_argument(
         "--signer", "-i",
         type=str,
-        choices=["self", "root-ca", "intermediate-ca"],
+        choices=["self", "root", "intermediate"],
         default="self",
-        help=("Signer for server and client certificates: self, root-CA, or intermediate-CA "
+        help=("Signer for server and client certificates: self, root, or intermediate "
               "(default: self)"))
     args = parser.parse_args()
     return args

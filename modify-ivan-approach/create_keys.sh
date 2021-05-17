@@ -16,7 +16,7 @@ openssl req \
 openssl ca \
     -batch \
     -in root.csr \
-    -out root.pem \
+    -out root.crt \
     -config root.config \
     -selfsign \
     -extfile ca.ext \
@@ -38,7 +38,7 @@ openssl req \
 openssl ca \
     -batch \
     -in intermediate.csr \
-    -out intermediate.pem \
+    -out intermediate.crt \
     -config root.config \
     -extfile ca.ext \
     -days 730
@@ -59,16 +59,16 @@ openssl req \
 openssl ca \
     -batch \
     -in client.csr \
-    -out client.pem \
+    -out client.crt \
     -config intermediate.config \
     -days 365
 
 # verify the certificate chain
 openssl verify \
     -x509_strict \
-    -CAfile root.pem \
-    -untrusted intermediate.pem \
-    client.pem
+    -CAfile root.crt \
+    -untrusted intermediate.crt \
+    client.crt
 
 # create the private key for the server certificate
 openssl genrsa \
@@ -86,16 +86,16 @@ openssl req \
 openssl ca \
     -batch \
     -in server.csr \
-    -out server.pem \
+    -out server.crt \
     -config intermediate.config \
     -days 365
 
 # verify the certificate chain
 openssl verify \
     -x509_strict \
-    -CAfile root.pem \
-    -untrusted intermediate.pem \
-    server.pem
+    -CAfile root.crt \
+    -untrusted intermediate.crt \
+    server.crt
 
 
 
