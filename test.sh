@@ -3,10 +3,10 @@
 FALSE=0
 TRUE=1
 
-# NORMAL=$(tput sgr0)
-# RED=$(tput setaf 1)
-# BLUE=$(tput setaf 4)
-# BEEP=$(tput bel)
+NORMAL=$(tput sgr0)
+RED=$(tput setaf 1)
+GREEN=$(tput setaf 2)
+BEEP=$(tput bel)
 
 function client_to_server_call ()
 {
@@ -19,11 +19,11 @@ function client_to_server_call ()
         signer_option="--signer $signer"
     fi
 
-    ./server.py --authentication $authentication $signer_option >server.out 2>&1 &
+    ./server.py --authentication $authentication $signer_option >/dev/null 2>&1 &
     server_pid=$!
     sleep 0.2
 
-    if ./client.py --authentication $authentication $signer_option >client.out 2>&1; then
+    if ./client.py --authentication $authentication $signer_option >/dev/null 2>&1; then
         failure=$FALSE
     else
         failure=$TRUE
@@ -46,14 +46,15 @@ function success_test_case ()
         signer_option="--signer $signer"
     fi
 
-    ./create-keys-and-certs.sh --authentication $authentication $signer_option
+    ./create-keys-and-certs.sh --authentication $authentication $signer_option >/dev/null 2>&1
+
+    description="success_test_case: autentication=$authentication signer=$signer"
 
     if client_to_server_call $authentication $signer; then
-        echo Success
+        echo "${GREEN}Pass${NORMAL}: $description"
     else
-        echo Failure
+        echo "${RED}Fail${NORMAL}: $description"
     fi
-
 }
 
 function success_test_cases ()
