@@ -178,33 +178,29 @@ function create_certificate_signing_request ()
     echo "Created ${role} certificate signing request"
 }
 
-function create_root_private_key ()
+function create_ca_certificate ()
 {
-    create_private_key root
-}
+    role=$1
+    signer_role=$2
+    days=$3
 
-function create_root_certificate_signing_request ()
-{
-    create_certificate_signing_request root $ROOT_CA_COMMON_NAME
-}
+    mkdir -p admin
+    mkdir -p admin/${role}
 
-function create_root_certificate ()
-{
-    mkdir -p admin/root
-    > admin/root/database
-    > admin/root/index
-    echo "00" >admin/root/serial
+    > admin/${role}/database
+    > admin/${role}/index
+    echo "00" >admin/${role}/serial
 
     {
         echo "[ca]"
         echo "default_ca      = CA_default"
         echo
         echo "[CA_default]"
-        echo "database        = admin/root/database"
-        echo "new_certs_dir   = admin/root"
-        echo "certificate     = certs/root.crt"
-        echo "serial          = admin/root/serial"
-        echo "private_key     = keys/root.key"
+        echo "database        = admin/${role}/database"
+        echo "new_certs_dir   = admin/${role}"
+        echo "certificate     = certs/${role}.crt"
+        echo "serial          = admin/${role}/serial"
+        echo "private_key     = keys/${role}.key"
         echo "policy          = policy_any"
         echo "email_in_dn     = no"
         echo "unique_subject  = no"
@@ -217,25 +213,46 @@ function create_root_certificate ()
         echo "organizationName       = optional"
         echo "organizationalUnitName = optional"
         echo "commonName             = supplied"
-    } >admin/root.config
+    } >admin/${role}.config
 
     {
         echo "[default]"
         echo "basicConstraints = critical,CA:true"
         echo "keyUsage         = critical,keyCertSign"
-    } >admin/ca.ext
+    } >admin/${role}_ca.ext
+
+    if [ $role == $signer_role ]; then
+        maybe_self_sign="-selfsign"
+    else
+        maybe_self_sign=""
+    fi
 
     run_command "openssl ca \
                     -batch \
-                    -in admin/root.csr \
-                    -out certs/root.crt \
-                    -config admin/root.config \
-                    -selfsign \
-                    -extfile admin/ca.ext \
-                    -days $ROOT_DAYS" \
-                "Could not create root certificate"
+                    -in admin/${role}.csr \
+                    -out certs/${role}.crt \
+                    -config admin/${signer_role}.config \
+                    $maybe_self_sign \
+                    -extfile admin/${role}_ca.ext \
+                    -days $days" \
+                "Could not create ${role} certificate"
 
-    echo "Created root certificate"
+    echo "Created ${role} certificate"
+}
+
+function create_root_private_key ()
+{
+    create_private_key root
+}
+
+function create_root_certificate_signing_request ()
+{
+    create_certificate_signing_request root $ROOT_CA_COMMON_NAME
+}
+
+function create_root_certificate ()
+{
+    create_ca_certificate root root $ROOT_DAYS
 }
 
 function create_intermediate_private_key ()
@@ -250,48 +267,7 @@ function create_intermediate_certificate_signing_request ()
 
 function create_intermediate_certificate ()
 {
-    mkdir -p admin/intermediate
-    > admin/intermediate/database
-    > admin/intermediate/index
-    echo "00" >admin/intermediate/serial
-
-    {
-        echo "[ca]"
-        echo "default_ca      = CA_default"
-        echo
-        echo "[CA_default]"
-        echo "database        = admin/intermediate/database"
-        echo "new_certs_dir   = admin/intermediate"
-        echo "certificate     = certs/intermediate.crt"
-        echo "serial          = admin/intermediate/serial"
-        echo "private_key     = keys/intermediate.key"
-        echo "policy          = policy_any"
-        echo "email_in_dn     = no"
-        echo "unique_subject  = no"
-        echo "copy_extensions = none"
-        echo "default_md      = sha256"
-        echo
-        echo "[policy_any]"
-        echo "countryName            = optional"
-        echo "stateOrProvinceName    = optional"
-        echo "organizationName       = optional"
-        echo "organizationalUnitName = optional"
-        echo "commonName             = supplied"
-    } >admin/intermediate.config
-
-    # Root certificate is always create before intermediate certificate; we can safely assume that
-    # root.config and ca.ext have already been created.
-
-    run_command "openssl ca \
-                    -batch \
-                    -in admin/intermediate.csr \
-                    -out certs/intermediate.crt \
-                    -config admin/root.config \
-                    -extfile admin/ca.ext \
-                    -days $INTERMEDIATE_DAYS" \
-                "Could not create intermediate certificate"
-
-    echo "Created intermediate certificate"
+    create_ca_certificate intermediate root $INTERMEDIATE_DAYS
 }
 
 function create_client_private_key ()
