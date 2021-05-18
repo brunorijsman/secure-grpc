@@ -319,13 +319,6 @@ if [[ "$AUTHENTICATION" == "none" ]]; then
     exit 0
 fi
 
-# if [[ "$AUTHENTICATION" == "mutual" ]]; then
-#     create_client_private_key_and_cert
-# fi
-# if [[ "$AUTHENTICATION" == "server" ]] || [[ "$AUTHENTICATION" == "mutual" ]]; then
-#     create_server_private_key_and_cert
-# fi
-
 if [[ "$SIGNER" == "root" || "$SIGNER" == "intermediate" ]]; then
     create_ca_credentials root root "$ROOT_CA_COMMON_NAME" $ROOT_DAYS
 fi
