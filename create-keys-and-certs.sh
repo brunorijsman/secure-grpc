@@ -312,11 +312,27 @@ function create_client_certificate_chain ()
     cat certs/client.crt certs/intermediate.crt certs/root.crt >certs/client.pem
 }
 
-###---
+function create_server_private_key ()
+{
+    create_private_key server
+}
 
+function create_server_certificate_signing_request ()
+{
+    create_certificate_signing_request server $SERVER_HOST
+}
 
+function create_server_certificate ()
+{
+    create_leaf_certificate server intermediate $LEAF_DAYS
+}
 
+function create_server_certificate_chain ()
+{
+    cat certs/server.crt certs/intermediate.crt certs/root.crt >certs/server.pem
+}
 
+# ------- GET RID OF THIS vvvv
 
 function create_private_key_and_self_signed_cert ()
 {
@@ -404,6 +420,8 @@ function create_client_private_key_and_cert ()
     fi
 }
 
+# ------- GET RID OF THIS ^^^^
+
 parse_command_line_options $@
 empty_keys_and_certs_dirs
 
@@ -435,3 +453,8 @@ create_client_private_key
 create_client_certificate_signing_request
 create_client_certificate
 create_client_certificate_chain
+
+create_server_private_key
+create_server_certificate_signing_request
+create_server_certificate
+create_server_certificate_chain
