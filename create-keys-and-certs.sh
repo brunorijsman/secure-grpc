@@ -20,6 +20,7 @@ ROOT_CA_COMMON_NAME="${ORGANIZATION} Root Certificate Authority"
 INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION} Intermediate Certificate Authority"
 ROOT_DAYS=1095
 INTERMEDIATE_DAYS=730
+LEAF_DAYS=365
 
 # TODO: Support subject alternative names (SAN)
 # See https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/ for
@@ -172,21 +173,20 @@ function create_root_certificate_signing_request ()
 
 function create_root_certificate ()
 {
-    touch admin/root.db
-
-    touch admin/root.index
-
-    echo "00" >admin/root.serial
+    mkdir -p admin/root
+    > admin/root/database
+    > admin/root/index
+    echo "00" >admin/root/serial
 
     {
         echo "[ca]"
         echo "default_ca      = CA_default"
         echo
         echo "[CA_default]"
-        echo "database        = admin/root.db"
-        echo "new_certs_dir   = ./"
+        echo "database        = admin/root/database"
+        echo "new_certs_dir   = admin/root"
         echo "certificate     = certs/root.crt"
-        echo "serial          = admin/root.serial"
+        echo "serial          = admin/root/serial"
         echo "private_key     = keys/root.key"
         echo "policy          = policy_any"
         echo "email_in_dn     = no"
@@ -255,11 +255,34 @@ function create_intermediate_certificate_signing_request ()
 
 function create_intermediate_certificate ()
 {
-    touch admin/intermediate.db
+    mkdir -p admin/intermediate
+    > admin/intermediate/database
+    > admin/intermediate/index
+    echo "00" >admin/intermediate/serial
 
-    touch admin/intermediate.index
-
-    echo "00" >admin/intermediate.serial
+    {
+        echo "[ca]"
+        echo "default_ca      = CA_default"
+        echo
+        echo "[CA_default]"
+        echo "database        = admin/intermediate/database"
+        echo "new_certs_dir   = admin/intermediate"
+        echo "certificate     = certs/intermediate.crt"
+        echo "serial          = admin/intermediate/serial"
+        echo "private_key     = keys/intermediate.key"
+        echo "policy          = policy_any"
+        echo "email_in_dn     = no"
+        echo "unique_subject  = no"
+        echo "copy_extensions = none"
+        echo "default_md      = sha256"
+        echo
+        echo "[policy_any]"
+        echo "countryName            = optional"
+        echo "stateOrProvinceName    = optional"
+        echo "organizationName       = optional"
+        echo "organizationalUnitName = optional"
+        echo "commonName             = supplied"
+    } >admin/intermediate.config
 
     # Root certificate is always create before intermediate certificate; we can safely assume that
     # root.config and ca.ext have already been created.
@@ -275,6 +298,63 @@ function create_intermediate_certificate ()
 
     echo "Created intermediate certificate"
 }
+
+function create_client_private_key ()
+{
+    run_command "openssl genrsa \
+                    -out keys/client.key \
+                    2048" \
+                "Could not create client private key"
+
+    echo "Created client private key"
+}
+
+function create_client_certificate_signing_request ()
+{
+    # TODO: Put this common code in a function
+    {
+        echo "[req]"
+        echo "distinguished_name = req_distinguished_name"
+        echo "prompt             = no"
+        echo
+        echo "[req_distinguished_name]"
+        echo "countryName = US"
+        echo "commonName  = $CLIENT_HOST"
+    } >admin/client_req.config
+
+    run_command "openssl req \
+                    -new \
+                    -key keys/client.key \
+                    -out admin/client.csr \
+                    -config admin/client_req.config" \
+                "Could not create client certificate signing request"
+
+    echo "Created client certificate signing request"
+}
+
+function create_client_certificate ()
+{
+    run_command "openssl ca \
+                    -batch \
+                    -in admin/client.csr \
+                    -out certs/client.crt \
+                    -config admin/intermediate.config \
+                    -days $LEAF_DAYS" \
+                "Could not create client certificate"
+
+    echo "Created client certificate"
+}
+
+function create_client_certificate_chain ()
+{
+    cat certs/client.crt certs/intermediate.crt certs/root.crt >certs/client.pem
+}
+
+###---
+
+
+
+
 
 function create_private_key_and_self_signed_cert ()
 {
@@ -388,3 +468,8 @@ create_root_certificate
 create_intermediate_private_key
 create_intermediate_certificate_signing_request
 create_intermediate_certificate
+
+create_client_private_key
+create_client_certificate_signing_request
+create_client_certificate
+create_client_certificate_chain
