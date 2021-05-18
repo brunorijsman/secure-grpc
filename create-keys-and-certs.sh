@@ -139,18 +139,21 @@ function empty_keys_and_certs_dirs ()
 
 }
 
-function create_root_private_key ()
+function create_private_key ()
 {
+    role=$1
     run_command "openssl genrsa \
-                    -out keys/root.key \
+                    -out keys/${role}.key \
                     2048" \
-                "Could not create root private key"
+                "Could not create ${role} private key"
 
-    echo "Created root private key"
+    echo "Created ${role} private key"
 }
 
-function create_root_certificate_signing_request ()
+function create_req_config ()
 {
+    role=$1
+    common_name=$2
     {
         echo "[req]"
         echo "distinguished_name = req_distinguished_name"
@@ -158,8 +161,19 @@ function create_root_certificate_signing_request ()
         echo
         echo "[req_distinguished_name]"
         echo "countryName = US"
-        echo "commonName  = $ROOT_CA_COMMON_NAME"
-    } >admin/root_req.config
+        echo "commonName  = ${common_name}"
+    } >admin/${role}_req.config
+
+}
+
+function create_root_private_key ()
+{
+    create_private_key root
+}
+
+function create_root_certificate_signing_request ()
+{
+    create_req_config root $ROOT_CA_COMMON_NAME
 
     run_command "openssl req \
                     -new \
@@ -223,25 +237,12 @@ function create_root_certificate ()
 
 function create_intermediate_private_key ()
 {
-    run_command "openssl genrsa \
-                    -out keys/intermediate.key \
-                    2048" \
-                "Could not create intermediate private key"
-
-    echo "Created intermediate private key"
+    create_private_key intermediate
 }
 
 function create_intermediate_certificate_signing_request ()
 {
-    {
-        echo "[req]"
-        echo "distinguished_name = req_distinguished_name"
-        echo "prompt             = no"
-        echo
-        echo "[req_distinguished_name]"
-        echo "countryName = US"
-        echo "commonName  = $INTERMEDIATE_CA_COMMON_NAME"
-    } >admin/intermediate_req.config
+    create_req_config intermediate $INTERMEDIATE_CA_COMMON_NAME
 
     run_command "openssl req \
                     -new \
@@ -301,26 +302,12 @@ function create_intermediate_certificate ()
 
 function create_client_private_key ()
 {
-    run_command "openssl genrsa \
-                    -out keys/client.key \
-                    2048" \
-                "Could not create client private key"
-
-    echo "Created client private key"
+    create_private_key client
 }
 
 function create_client_certificate_signing_request ()
 {
-    # TODO: Put this common code in a function
-    {
-        echo "[req]"
-        echo "distinguished_name = req_distinguished_name"
-        echo "prompt             = no"
-        echo
-        echo "[req_distinguished_name]"
-        echo "countryName = US"
-        echo "commonName  = $CLIENT_HOST"
-    } >admin/client_req.config
+    create_req_config client $CLIENT_HOST
 
     run_command "openssl req \
                     -new \
