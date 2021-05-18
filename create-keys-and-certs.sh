@@ -128,7 +128,7 @@ function run_command ()
     fi
 }
 
-function empty_keys_and_certs_dirs ()
+function clean_previous_run ()
 {
     rm -rf keys
     mkdir keys
@@ -141,7 +141,7 @@ function empty_keys_and_certs_dirs ()
 
 function create_private_key ()
 {
-    role=$1
+    role="$1"
     mkdir -p keys
     run_command "openssl genrsa \
                     -out keys/${role}.key \
@@ -153,8 +153,8 @@ function create_private_key ()
 
 function create_certificate_signing_request ()
 {
-    role=$1
-    common_name=$2
+    role="$1"
+    common_name="$2"
 
     mkdir -p admin
 
@@ -183,9 +183,9 @@ function create_certificate_signing_request ()
 
 function create_ca_certificate ()
 {
-    role=$1
-    signer_role=$2
-    days=$3
+    role="$1"
+    signer_role="$2"
+    days="$3"
 
     mkdir -p admin
     mkdir -p admin/${role}
@@ -243,197 +243,82 @@ function create_ca_certificate ()
     echo "Created ${role} certificate"
 }
 
+function create_ca_credentials ()
+{
+    role="$1"
+    signer_role="$2"
+    common_name="$3"
+    days="$4"
+
+    create_private_key $role
+    create_certificate_signing_request $role "$common_name"
+    create_ca_certificate $role $signer_role $days
+}
+
 function create_leaf_certificate ()
 {
-    role=$1
-    signer_role=$2
-    days=$3
+    role="$1"
+    signer_role="$2"
+    days="$3"
 
     mkdir -p certs
+
+    if [ $role == $signer_role ]; then
+        maybe_self_sign="-selfsign"
+    else
+        maybe_self_sign=""
+    fi
 
     run_command "openssl ca \
                     -batch \
                     -in admin/${role}.csr \
                     -out certs/${role}.crt \
                     -config admin/${signer_role}.config \
+                    $maybe_self_sign \
                     -days $days" \
                 "Could not create ${role} certificate"
 
     echo "Created ${role} certificate"
 }
 
-function create_root_private_key ()
+function create_leaf_credentials ()
 {
-    create_private_key root
-}
+    role="$1"
+    signer="$2"
+    common_name="$3"
+    days="$4"
 
-function create_root_certificate_signing_request ()
-{
-    create_certificate_signing_request root "$ROOT_CA_COMMON_NAME"
-}
-
-function create_root_certificate ()
-{
-    create_ca_certificate root root $ROOT_DAYS
-}
-
-function create_intermediate_private_key ()
-{
-    create_private_key intermediate
-}
-
-function create_intermediate_certificate_signing_request ()
-{
-    create_certificate_signing_request intermediate "$INTERMEDIATE_CA_COMMON_NAME"
-}
-
-function create_intermediate_certificate ()
-{
-    create_ca_certificate intermediate root $INTERMEDIATE_DAYS
-}
-
-function create_client_private_key ()
-{
-    create_private_key client
-}
-
-function create_client_certificate_signing_request ()
-{
-    create_certificate_signing_request client $CLIENT_HOST
-}
-
-function create_client_certificate ()
-{
-    create_leaf_certificate client intermediate $LEAF_DAYS
-}
-
-function create_client_certificate_chain ()
-{
-    cat certs/client.crt certs/intermediate.crt certs/root.crt >certs/client.pem
-}
-
-function create_server_private_key ()
-{
-    create_private_key server
-}
-
-function create_server_certificate_signing_request ()
-{
-    create_certificate_signing_request server $SERVER_HOST
-}
-
-function create_server_certificate ()
-{
-    create_leaf_certificate server intermediate $LEAF_DAYS
-}
-
-function create_server_certificate_chain ()
-{
-    cat certs/server.crt certs/intermediate.crt certs/root.crt >certs/server.pem
-}
-
-# ------- GET RID OF THIS vvvv
-
-function create_private_key_and_self_signed_cert ()
-{
-    file_base="$1"
-    common_name="$2"
-    run_command "openssl \
-                    req \
-                    -newkey rsa:2048 \
-                    -nodes \
-                    -keyout keys/${file_base}.key \
-                    -x509 \
-                    -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION_NAME}/CN=${common_name} \
-                    -days ${DAYS_VALID} \
-                    -out certs/${file_base}.crt" \
-                "Could not create ${file_base} private key and self-signed certificate"
-    echo "Created ${file_base} private key file: ${file_base}.key"
-    echo "Created ${file_base} self-signed certificate file: ${file_base}.crt"
-}
-
-function create_private_key_and_ca_signed_cert ()
-{
-    file_base="$1"
-    common_name="$2"
-    signing_ca="$3"
-    signing_ca_certificate="${signing_ca}.crt"
-    signing_ca_private_key="${signing_ca}.key"
-    # Create the private key (.key) and certificate signing request (.csr)
-    run_command "openssl \
-                    req \
-                    -newkey rsa:2048 \
-                    -nodes \
-                    -keyout keys/${file_base}.key \
-                    -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION_NAME}/CN=${common_name} \
-                    -out certs/${file_base}.csr" \
-                "Could not create ${file_base} private key and certificate signing request"
-    echo "Created ${file_base} private key file: ${file_base}.key"
-    echo "Created ${file_base} certificate signing request file: ${file_base}.csr"
-    # Create the CA-signed certificate
-    run_command "openssl \
-                    x509 \
-                    -req \
-                    -in certs/${file_base}.csr \
-                    -CA certs/${signing_ca_certificate} \
-                    -CAkey keys/${signing_ca_private_key} \
-                    -CAcreateserial \
-                    -days ${DAYS_VALID} \
-                    -out certs/${file_base}.crt" \
-                "Could not create ${file_base} certificate"
-    echo "Created ${file_base} certificate file: ${file_base}.crt"
-}
-
-function create_root_ca_private_key_and_cert ()
-{
-    create_private_key_and_self_signed_cert root "$ROOT_CA_COMMON_NAME"
-}
-
-function create_intermediate_ca_private_key_and_cert ()
-{
-    create_private_key_and_ca_signed_cert intermediate "$INTERMEDIATE_CA_COMMON_NAME" root
-}
-
-function create_server_private_key_and_cert ()
-{
-    if [[ "$SIGNER" == "root" ]]; then
-        create_private_key_and_ca_signed_cert server "$SERVER_HOST" root
-    elif [[ "$SIGNER" == "intermediate" ]]; then
-        create_private_key_and_ca_signed_cert server "$SERVER_HOST" intermediate
-    elif [[ "$SIGNER" == "self" ]]; then
-        create_private_key_and_self_signed_cert server "$SERVER_HOST"
+    if [[ $signer == "self" ]]; then
+        signer_role=$role
     else
-        fatal_error "Unknown signer \"${SIGNER}\""
+        signer_role=$signer
+    fi
+
+    create_private_key $role
+    create_certificate_signing_request $role "$common_name"
+    create_leaf_certificate $role $signer_role $days
+
+    if [[ $signer_role == "root" ]]; then
+        cat certs/${role}.crt certs/root.crt >certs/${role}.pem
+    elif [[ $signer_role == "intermediate" ]]; then
+        cat certs/${role}.crt certs/intermediate.crt certs/root.crt >certs/${role}.pem
+    elif [[ $signer_role == $role ]]; then
+        cat certs/${role}.crt >certs/${role}.pem
     fi
 }
-
-function create_client_private_key_and_cert ()
-{
-    if [[ "$SIGNER" == "root" ]]; then
-        create_private_key_and_ca_signed_cert client "$CLIENT_HOST" root
-    elif [[ "$SIGNER" == "intermediate" ]]; then
-        create_private_key_and_ca_signed_cert client "$CLIENT_HOST" intermediate
-    elif [[ "$SIGNER" == "self" ]]; then
-        create_private_key_and_self_signed_cert client "$CLIENT_HOST"
-    else
-        fatal_error "Unknown signer \"${SIGNER}\""
-    fi
-}
-
-# ------- GET RID OF THIS ^^^^
 
 parse_command_line_options $@
-empty_keys_and_certs_dirs
 
-# if [[ $CLEAN == $TRUE ]]; then
-#     exit 0
-# fi
-# if [[ "$SIGNER" == "root" ]] || [[ "$SIGNER" == "intermediate" ]]; then
-#     create_root_ca_private_key_and_cert
-# fi
-# if [[ "$SIGNER" == "intermediate" ]]; then
-#     create_intermediate_ca_private_key_and_cert
-# fi
+clean_previous_run
+if [[ $CLEAN == $TRUE ]]; then
+    echo "All generated files from previous runs removed"
+    exit 0
+fi
+if [[ "$AUTHENTICATION" == "none" ]]; then
+    echo "No authentication (no keys or certificates generated)"
+    exit 0
+fi
+
 # if [[ "$AUTHENTICATION" == "mutual" ]]; then
 #     create_client_private_key_and_cert
 # fi
@@ -442,23 +327,13 @@ empty_keys_and_certs_dirs
 # fi
 
 if [[ "$SIGNER" == "root" || "$SIGNER" == "intermediate" ]]; then
-    create_root_private_key
-    create_root_certificate_signing_request
-    create_root_certificate
+    create_ca_credentials root root "$ROOT_CA_COMMON_NAME" $ROOT_DAYS
 fi
 
 if [[ "$SIGNER" == "intermediate" ]]; then
-    create_intermediate_private_key
-    create_intermediate_certificate_signing_request
-    create_intermediate_certificate
+    create_ca_credentials intermediate root "$INTERMEDIATE_CA_COMMON_NAME" $INTERMEDIATE_DAYS
 fi
 
-create_client_private_key
-create_client_certificate_signing_request
-create_client_certificate
-create_client_certificate_chain
+create_leaf_credentials client $SIGNER "$CLIENT_HOST" $LEAF_DAYS
 
-create_server_private_key
-create_server_certificate_signing_request
-create_server_certificate
-create_server_certificate_chain
+create_leaf_credentials server $SIGNER "$SERVER_HOST" $LEAF_DAYS
