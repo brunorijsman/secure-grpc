@@ -298,6 +298,7 @@ function create_leaf_private_key_and_self_signed_certificate ()
     run_command "openssl req \
                     -x509 \
                     -nodes \
+                    -text \
                     -newkey rsa:4096 \
                     -keyout keys/${role}.key \
                     -out certs/${role}.crt \
