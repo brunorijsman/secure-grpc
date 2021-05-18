@@ -14,10 +14,12 @@ CLIENT_HOST="localhost"
 SERVER_HOST="localhost"
 SIGNER="self"
 
-# TODO: Put country etc. in variables
-ORGANIZATION="Example Corp"
-ROOT_CA_COMMON_NAME="${ORGANIZATION} Root Certificate Authority"
-INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION} Intermediate Certificate Authority"
+COUNTRY_NAME="US"
+STATE_OR_PROVINCE_NAME="WA"
+ORGANIZATION_NAME="Example Corp"
+ORGANIZATIONAL_UNIT_NAME="Engineering"
+ROOT_CA_COMMON_NAME="${ORGANIZATION_NAME} Root Certificate Authority"
+INTERMEDIATE_CA_COMMON_NAME="${ORGANIZATION_NAME} Intermediate Certificate Authority"
 ROOT_DAYS=1095
 INTERMEDIATE_DAYS=730
 LEAF_DAYS=365
@@ -25,8 +27,6 @@ LEAF_DAYS=365
 # TODO: Support subject alternative names (SAN)
 # See https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/ for
 # instructions on how to use config files to achieve that.
-
-# TODO: Add support for -extfile
 
 function help ()
 {
@@ -164,8 +164,11 @@ function create_certificate_signing_request ()
         echo "prompt             = no"
         echo
         echo "[req_distinguished_name]"
-        echo "countryName = US"
-        echo "commonName  = ${common_name}"
+        echo "countryName            = ${COUNTRY_NAME}"
+        echo "stateOrProvinceName    = ${STATE_OR_PROVINCE_NAME}"
+        echo "organizationName       = ${ORGANIZATION_NAME}"
+        echo "organizationalUnitName = ${ORGANIZATIONAL_UNIT_NAME}"
+        echo "commonName             = ${common_name}"
     } >admin/${role}_req.config
 
     run_command "openssl req \
@@ -247,7 +250,7 @@ function create_root_private_key ()
 
 function create_root_certificate_signing_request ()
 {
-    create_certificate_signing_request root $ROOT_CA_COMMON_NAME
+    create_certificate_signing_request root "$ROOT_CA_COMMON_NAME"
 }
 
 function create_root_certificate ()
@@ -262,7 +265,7 @@ function create_intermediate_private_key ()
 
 function create_intermediate_certificate_signing_request ()
 {
-    create_certificate_signing_request intermediate $INTERMEDIATE_CA_COMMON_NAME
+    create_certificate_signing_request intermediate "$INTERMEDIATE_CA_COMMON_NAME"
 }
 
 function create_intermediate_certificate ()
@@ -314,7 +317,7 @@ function create_private_key_and_self_signed_cert ()
                     -nodes \
                     -keyout keys/${file_base}.key \
                     -x509 \
-                    -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION}/CN=${common_name} \
+                    -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION_NAME}/CN=${common_name} \
                     -days ${DAYS_VALID} \
                     -out certs/${file_base}.crt" \
                 "Could not create ${file_base} private key and self-signed certificate"
@@ -335,7 +338,7 @@ function create_private_key_and_ca_signed_cert ()
                     -newkey rsa:2048 \
                     -nodes \
                     -keyout keys/${file_base}.key \
-                    -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION}/CN=${common_name} \
+                    -subj /C=US/ST=WA/L=Seattle/O=${ORGANIZATION_NAME}/CN=${common_name} \
                     -out certs/${file_base}.csr" \
                 "Could not create ${file_base} private key and certificate signing request"
     echo "Created ${file_base} private key file: ${file_base}.key"
