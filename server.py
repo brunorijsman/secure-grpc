@@ -16,16 +16,16 @@ class Adder(adder_pb2_grpc.AdderServicer):
 def make_credentials(args):
     assert args.authentication in ["server", "mutual"]
     assert args.signer in ["self", "root", "intermediate"]
-    server_private_key = open("server.key", "br").read()
-    server_certificate = open("server.crt", "br").read()
-    private_key_certificate_chain_pairs = [(server_private_key, server_certificate)]
+    server_private_key = open("keys/server.key", "br").read()
+    server_certificate_chain = open("certs/server.pem", "br").read()
+    private_key_certificate_chain_pairs = [(server_private_key, server_certificate_chain)]
     if args.authentication == "mutual":
         if args.signer == "self":
-            root_certificate_for_client = open("client.crt", "br").read()
+            root_certificate_for_client = open("certs/client.crt", "br").read()
         elif args.signer == "root":
-            root_certificate_for_client = open("root.crt", "br").read()
+            root_certificate_for_client = open("certs/root.crt", "br").read()
         else:
-            root_certificate_for_client = open("intermediate.crt", "br").read()
+            root_certificate_for_client = open("certs/intermediate.crt", "br").read()
     else:
         root_certificate_for_client = None
     credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs,

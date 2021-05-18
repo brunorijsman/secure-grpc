@@ -11,16 +11,16 @@ def make_credentials(args):
     assert args.authentication in ["server", "mutual"]
     assert args.signer in ["self", "root", "intermediate"]
     if args.signer == "self":
-        root_certificate_for_server = open("server.crt", "br").read()
+        root_certificate_for_server = open("certs/server.crt", "br").read()
     elif args.signer == "root":
-        root_certificate_for_server = open("root.crt", "br").read()
+        root_certificate_for_server = open("certs/root.crt", "br").read()
     else:
-        root_certificate_for_server = open("intermediate.crt", "br").read()
+        root_certificate_for_server = open("certs/intermediate.crt", "br").read()
     if args.authentication == "mutual":
-        client_private_key = open("client.key", "br").read()
-        client_certificate = open("client.crt", "br").read()
+        client_private_key = open("keys/client.key", "br").read()
+        client_certificate_chain = open("certs/client.pem", "br").read()
         credentials = grpc.ssl_channel_credentials(root_certificate_for_server, client_private_key,
-                                                   client_certificate)
+                                                   client_certificate_chain)
     else:
         credentials = grpc.ssl_channel_credentials(root_certificate_for_server)
     return credentials

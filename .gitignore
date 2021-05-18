@@ -140,3 +140,6 @@ dmypy.json
 keys/*
 certs/*
 admin/*
+
+# Test output files
+*.out
