@@ -243,6 +243,25 @@ function create_ca_certificate ()
     echo "Created ${role} certificate"
 }
 
+function create_leaf_certificate ()
+{
+    role=$1
+    signer_role=$2
+    days=$3
+
+    mkdir -p certs
+
+    run_command "openssl ca \
+                    -batch \
+                    -in admin/${role}.csr \
+                    -out certs/${role}.crt \
+                    -config admin/${signer_role}.config \
+                    -days $days" \
+                "Could not create ${role} certificate"
+
+    echo "Created ${role} certificate"
+}
+
 function create_root_private_key ()
 {
     create_private_key root
@@ -285,15 +304,7 @@ function create_client_certificate_signing_request ()
 
 function create_client_certificate ()
 {
-    run_command "openssl ca \
-                    -batch \
-                    -in admin/client.csr \
-                    -out certs/client.crt \
-                    -config admin/intermediate.config \
-                    -days $LEAF_DAYS" \
-                "Could not create client certificate"
-
-    echo "Created client certificate"
+    create_leaf_certificate client intermediate $LEAF_DAYS
 }
 
 function create_client_certificate_chain ()
