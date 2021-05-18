@@ -441,13 +441,17 @@ empty_keys_and_certs_dirs
 #     create_server_private_key_and_cert
 # fi
 
-create_root_private_key
-create_root_certificate_signing_request
-create_root_certificate
+if [[ "$SIGNER" == "root" || "$SIGNER" == "intermediate" ]]; then
+    create_root_private_key
+    create_root_certificate_signing_request
+    create_root_certificate
+fi
 
-create_intermediate_private_key
-create_intermediate_certificate_signing_request
-create_intermediate_certificate
+if [[ "$SIGNER" == "intermediate" ]]; then
+    create_intermediate_private_key
+    create_intermediate_certificate_signing_request
+    create_intermediate_certificate
+fi
 
 create_client_private_key
 create_client_certificate_signing_request
