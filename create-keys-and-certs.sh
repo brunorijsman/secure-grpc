@@ -142,6 +142,7 @@ function empty_keys_and_certs_dirs ()
 function create_private_key ()
 {
     role=$1
+    mkdir -p keys
     run_command "openssl genrsa \
                     -out keys/${role}.key \
                     2048" \
@@ -150,10 +151,13 @@ function create_private_key ()
     echo "Created ${role} private key"
 }
 
-function create_req_config ()
+function create_certificate_signing_request ()
 {
     role=$1
     common_name=$2
+
+    mkdir -p admin
+
     {
         echo "[req]"
         echo "distinguished_name = req_distinguished_name"
@@ -164,6 +168,14 @@ function create_req_config ()
         echo "commonName  = ${common_name}"
     } >admin/${role}_req.config
 
+    run_command "openssl req \
+                    -new \
+                    -key keys/${role}.key \
+                    -out admin/${role}.csr \
+                    -config admin/${role}_req.config" \
+                "Could not create ${role} certificate signing request"
+
+    echo "Created ${role} certificate signing request"
 }
 
 function create_root_private_key ()
@@ -173,16 +185,7 @@ function create_root_private_key ()
 
 function create_root_certificate_signing_request ()
 {
-    create_req_config root $ROOT_CA_COMMON_NAME
-
-    run_command "openssl req \
-                    -new \
-                    -key keys/root.key \
-                    -out admin/root.csr \
-                    -config admin/root_req.config" \
-                "Could not create root certificate signing request"
-
-    echo "Created root certificate signing request"
+    create_certificate_signing_request root $ROOT_CA_COMMON_NAME
 }
 
 function create_root_certificate ()
@@ -242,16 +245,7 @@ function create_intermediate_private_key ()
 
 function create_intermediate_certificate_signing_request ()
 {
-    create_req_config intermediate $INTERMEDIATE_CA_COMMON_NAME
-
-    run_command "openssl req \
-                    -new \
-                    -key keys/intermediate.key \
-                    -out admin/intermediate.csr \
-                    -config admin/intermediate_req.config" \
-                "Could not create intermediate certificate signing request"
-
-    echo "Created intermediate certificate signing request"
+    create_certificate_signing_request intermediate $INTERMEDIATE_CA_COMMON_NAME
 }
 
 function create_intermediate_certificate ()
@@ -307,16 +301,7 @@ function create_client_private_key ()
 
 function create_client_certificate_signing_request ()
 {
-    create_req_config client $CLIENT_HOST
-
-    run_command "openssl req \
-                    -new \
-                    -key keys/client.key \
-                    -out admin/client.csr \
-                    -config admin/client_req.config" \
-                "Could not create client certificate signing request"
-
-    echo "Created client certificate signing request"
+    create_certificate_signing_request client $CLIENT_HOST
 }
 
 function create_client_certificate ()
