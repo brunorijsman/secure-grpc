@@ -224,7 +224,7 @@ function create_ca_certificate ()
         echo "keyUsage         = critical,keyCertSign"
     } >admin/${role}_ca.ext
 
-    if [ $role == $signer_role ]; then
+    if [[ $signer_role == "self" || $signer_role == $role ]]; then
         maybe_self_sign="-selfsign"
     else
         maybe_self_sign=""
@@ -255,7 +255,7 @@ function create_ca_credentials ()
     create_ca_certificate $role $signer_role $days
 }
 
-function create_leaf_certificate ()
+function create_leaf_ca_signed_certificate ()
 {
     role="$1"
     signer_role="$2"
@@ -263,46 +263,90 @@ function create_leaf_certificate ()
 
     mkdir -p certs
 
-    if [ $role == $signer_role ]; then
-        maybe_self_sign="-selfsign"
-    else
-        maybe_self_sign=""
-    fi
-
     run_command "openssl ca \
                     -batch \
                     -in admin/${role}.csr \
                     -out certs/${role}.crt \
                     -config admin/${signer_role}.config \
-                    $maybe_self_sign \
                     -days $days" \
                 "Could not create ${role} certificate"
 
     echo "Created ${role} certificate"
 }
 
+function create_leaf_private_key_and_self_signed_certificate ()
+{
+    role="$1"
+    days="$2"
+
+    mkdir -p certs
+    mkdir -p admin
+
+    {
+        echo "[req]"
+        echo "distinguished_name = req_distinguished_name"
+        echo "prompt             = no"
+        echo
+        echo "[req_distinguished_name]"
+        echo "countryName            = ${COUNTRY_NAME}"
+        echo "stateOrProvinceName    = ${STATE_OR_PROVINCE_NAME}"
+        echo "organizationName       = ${ORGANIZATION_NAME}"
+        echo "organizationalUnitName = ${ORGANIZATIONAL_UNIT_NAME}"
+        echo "commonName             = ${common_name}"
+    } >admin/${role}_req.config
+
+    run_command "openssl req \
+                    -x509 \
+                    -nodes \
+                    -newkey rsa:4096 \
+                    -keyout keys/${role}.key \
+                    -out certs/${role}.crt \
+                    -config admin/${role}_req.config \
+                    -days $days" \
+                "Could not create ${role} certificate"
+
+    echo "Created ${role} certificate (self-signed)"
+}
+
+function create_leaf_self_signed_certificate ()
+{
+    role="$1"
+    signer_role="$2"
+    days="$3"
+
+    mkdir -p certs
+
+    run_command "openssl ca \
+                    -batch \
+                    -in admin/${role}.csr \
+                    -out certs/${role}.crt \
+                    -config admin/${signer_role}.config \
+                    -days $days" \
+                "Could not create ${role} certificate"
+
+    echo "Created ${role} certificate (signed by ${signer_role})"
+}
+
 function create_leaf_credentials ()
 {
     role="$1"
-    signer="$2"
+    signer_role="$2"
     common_name="$3"
     days="$4"
 
-    if [[ $signer == "self" ]]; then
-        signer_role=$role
+    if [[ $signer_role == "self" || $signer_role == $role ]]; then
+        create_leaf_private_key_and_self_signed_certificate $role $days
     else
-        signer_role=$signer
+        create_private_key $role
+        create_certificate_signing_request $role "$common_name"
+        create_leaf_ca_signed_certificate $role $signer_role $days
     fi
-
-    create_private_key $role
-    create_certificate_signing_request $role "$common_name"
-    create_leaf_certificate $role $signer_role $days
 
     if [[ $signer_role == "root" ]]; then
         cat certs/${role}.crt certs/root.crt >certs/${role}.pem
     elif [[ $signer_role == "intermediate" ]]; then
         cat certs/${role}.crt certs/intermediate.crt certs/root.crt >certs/${role}.pem
-    elif [[ $signer_role == $role ]]; then
+    else
         cat certs/${role}.crt >certs/${role}.pem
     fi
 }
@@ -327,6 +371,8 @@ if [[ "$SIGNER" == "intermediate" ]]; then
     create_ca_credentials intermediate root "$INTERMEDIATE_CA_COMMON_NAME" $INTERMEDIATE_DAYS
 fi
 
-create_leaf_credentials client $SIGNER "$CLIENT_HOST" $LEAF_DAYS
-
 create_leaf_credentials server $SIGNER "$SERVER_HOST" $LEAF_DAYS
+
+if [[ "$AUTHENTICATION" == "mutual" ]]; then
+    create_leaf_credentials client $SIGNER "$CLIENT_HOST" $LEAF_DAYS
+fi

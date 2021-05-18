@@ -34,7 +34,7 @@ def parse_command_line_arguments(role):
     return args
 
 def authentication_and_signer_summary(args):
-    assert args.authentication in ["server", "mutual"]
+    assert args.authentication in ["none", "server", "mutual"]
     assert args.signer in ["self", "root", "intermediate"]
     if args.authentication == "none":
         return "No authentication"
