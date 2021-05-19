@@ -13,6 +13,7 @@ CLEAN=${FALSE}
 CLIENT_HOST="localhost"
 SERVER_HOST="localhost"
 SIGNER="self"
+WRONG_KEY="none"
 
 COUNTRY_NAME="US"
 STATE_OR_PROVINCE_NAME="WA"
@@ -35,6 +36,14 @@ function help ()
     echo
     echo "    create-keys-and-certs.sh [OPTION]..."
     echo
+    echo "DESCRIPTION"
+    echo
+    echo "  Generate a set of private keys and certificates for the gRPC server and (if mutual"
+    echo "  authentication is used) also for the gRPC client. The certificates can be self-signed,"
+    echo "  or signed by a root CA, or signed by an intermediate CA. For negative testing, it is"
+    echo "  possible to purposely generate a wrong private key (one that does not match the"
+    echo "  public key in the certificate)."
+    echo
     echo "OPTIONS"
     echo
     echo "  --help, -h, -?"
@@ -53,13 +62,25 @@ function help ()
     echo "      The server hostname. Default: localhost."
     echo
     echo "  --signer {self, root, intermediate}, -i {self, root, intermediate}"
+    echo "      Who signs the certificates:"
     echo "      self: server and client certificates are self-signed."
     echo "      root: server and client certificates are signed by the root CA."
-    echo "      intermediate: server and client certificates are signed by an intermediate CA."
+    echo "      intermediate: server and client certificates are signed by an intermediate CA; and"
+    echo "      the intermediate CA certificate is signed by the root CA."
     echo "      (Default: self)"
     echo
     echo "  -x, --clean"
     echo "      Remove all private key and certificate files."
+    echo
+    echo -n "  --wrong-key {none, server, client, intermediate, root}"
+    echo " -w {none, server, client, intermediate, root}"
+    echo "      Generate an incorrect private key (this is used for negative testing):"
+    echo "      none: don't generate an incorrect private key; all private keys are correct."
+    echo "      server: generate an incorrect private key for the server."
+    echo "      client: generate an incorrect private key for the client."
+    echo "      root: generate an incorrect private key for the root CA."
+    echo "      intermediate: generate an incorrect private key for the intermediate CA."
+    echo "      (Default: none)"
     echo
     exit 0
 }
@@ -107,6 +128,19 @@ function parse_command_line_options ()
                       fatal_error "Unknown signer \"$SIGNER\". Use self, root, or intermediate"
                 fi
                 ;;
+            --wrong-key|-w)
+                WRONG_KEY="$2"
+                shift
+                if [[ "${WRONG_KEY}" != "none" ]] && \
+                   [[ "${WRONG_KEY}" != "server" ]] && \
+                   [[ "${WRONG_KEY}" != "client" ]] && \
+                   [[ "${WRONG_KEY}" != "root" ]] && \
+                   [[ "${WRONG_KEY}" != "intermediate" ]]; then
+                      msg="Unknown wrong-key \"$WRONG_KEY\". "
+                      msg="$msg Use server, client, root, or intermediate"
+                      fatal_error "$msg"
+                fi
+                ;;
             *)
                 fatal_error "Unknown parameter passed: $1"
                 ;;
@@ -117,13 +151,15 @@ function parse_command_line_options ()
 
 function run_command ()
 {
-    command=$1
-    failure_msg=$2
+    command="$1"
+    failure_msg="$2"
     output=$(${command} 2>&1)
     if [ $? -ne 0 ] ; then
-        echo "Error, the following command failed:"
-        echo $command
-        echo "${output}"
+        echo "${RED}Error:${NORMAL} $failure_msg:"
+        echo "The following command failed:"
+        echo "${BLUE}${command}${NORMAL}"
+        echo "The output of the command was:"
+        echo "${BLUE}${output}${NORMAL}"
         exit 1
     fi
 }
@@ -136,7 +172,6 @@ function clean_previous_run ()
     mkdir certs
     rm -rf admin
     mkdir admin
-
 }
 
 function create_private_key ()
@@ -328,6 +363,22 @@ function create_leaf_self_signed_certificate ()
     echo "Created ${role} certificate (signed by ${signer_role})"
 }
 
+function create_leaf_certificate_chain ()
+{
+    role="$1"
+    signer_role="$2"
+
+    if [[ $signer_role == "root" ]]; then
+        cat certs/${role}.crt certs/root.crt >certs/${role}.pem
+    elif [[ $signer_role == "intermediate" ]]; then
+        cat certs/${role}.crt certs/intermediate.crt certs/root.crt >certs/${role}.pem
+    else
+        cat certs/${role}.crt >certs/${role}.pem
+    fi
+
+    echo "Created ${role} certificate chain"
+}
+
 function create_leaf_credentials ()
 {
     role="$1"
@@ -343,13 +394,7 @@ function create_leaf_credentials ()
         create_leaf_ca_signed_certificate $role $signer_role $days
     fi
 
-    if [[ $signer_role == "root" ]]; then
-        cat certs/${role}.crt certs/root.crt >certs/${role}.pem
-    elif [[ $signer_role == "intermediate" ]]; then
-        cat certs/${role}.crt certs/intermediate.crt certs/root.crt >certs/${role}.pem
-    else
-        cat certs/${role}.crt >certs/${role}.pem
-    fi
+    create_leaf_certificate_chain $role $signer_role
 }
 
 parse_command_line_options $@
@@ -377,3 +422,29 @@ create_leaf_credentials server $SIGNER "$SERVER_HOST" $LEAF_DAYS
 if [[ "$AUTHENTICATION" == "mutual" ]]; then
     create_leaf_credentials client $SIGNER "$CLIENT_HOST" $LEAF_DAYS
 fi
+
+case $WRONG_KEY in
+    none)
+        ;;
+    server)
+        create_private_key server
+        ;;
+    client)
+        create_private_key client
+        ;;
+    root)
+        create_ca_credentials root root "$ROOT_CA_COMMON_NAME" $ROOT_DAYS
+        create_leaf_certificate_chain server $SIGNER
+        if [[ "$AUTHENTICATION" == "mutual" ]]; then
+            create_leaf_certificate_chain client $SIGNER
+        fi
+        ;;
+    intermediate)
+        create_ca_credentials intermediate root "$INTERMEDIATE_CA_COMMON_NAME" $INTERMEDIATE_DAYS
+        create_leaf_certificate_chain server $SIGNER
+        if [[ "$AUTHENTICATION" == "mutual" ]]; then
+            create_leaf_certificate_chain client $SIGNER
+        fi
+        ;;
+esac
+

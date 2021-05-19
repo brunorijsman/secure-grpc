@@ -22,10 +22,9 @@ def make_credentials(args):
     if args.authentication == "mutual":
         if args.signer == "self":
             root_certificate_for_client = open("certs/client.crt", "br").read()
-        elif args.signer == "root":
-            root_certificate_for_client = open("certs/root.crt", "br").read()
         else:
-            root_certificate_for_client = open("certs/intermediate.crt", "br").read()
+            # Even if direct signer is intermediate, the root is still the root
+            root_certificate_for_client = open("certs/root.crt", "br").read()
         credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs,
                                                 root_certificate_for_client, True)
     else:

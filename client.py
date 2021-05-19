@@ -12,10 +12,9 @@ def make_credentials(args):
     assert args.signer in ["self", "root", "intermediate"]
     if args.signer == "self":
         root_certificate_for_server = open("certs/server.crt", "br").read()
-    elif args.signer == "root":
-        root_certificate_for_server = open("certs/root.crt", "br").read()
     else:
-        root_certificate_for_server = open("certs/intermediate.crt", "br").read()
+        # Even if direct signer is intermediate, the root is still the root
+        root_certificate_for_server = open("certs/root.crt", "br").read()
     if args.authentication == "mutual":
         client_private_key = open("keys/client.key", "br").read()
         client_certificate_chain = open("certs/client.pem", "br").read()
