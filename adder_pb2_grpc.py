@@ -3,7 +3,6 @@
 import grpc
 
 import adder_pb2 as adder__pb2
-from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
 class AdderStub(object):
@@ -20,23 +19,12 @@ class AdderStub(object):
                 request_serializer=adder__pb2.AddRequest.SerializeToString,
                 response_deserializer=adder__pb2.AddReply.FromString,
                 )
-        self.Stop = channel.unary_unary(
-                '/adder.Adder/Stop',
-                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                )
 
 
 class AdderServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def Add(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Stop(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -49,11 +37,6 @@ def add_AdderServicer_to_server(servicer, server):
                     servicer.Add,
                     request_deserializer=adder__pb2.AddRequest.FromString,
                     response_serializer=adder__pb2.AddReply.SerializeToString,
-            ),
-            'Stop': grpc.unary_unary_rpc_method_handler(
-                    servicer.Stop,
-                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -79,22 +62,5 @@ class Adder(object):
         return grpc.experimental.unary_unary(request, target, '/adder.Adder/Add',
             adder__pb2.AddRequest.SerializeToString,
             adder__pb2.AddReply.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def Stop(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/adder.Adder/Stop',
-            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

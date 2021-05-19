@@ -11,7 +11,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
@@ -20,9 +19,8 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0b\x61\x64\x64\x65r.proto\x12\x05\x61\x64\x64\x65r\x1a\x1bgoogle/protobuf/empty.proto\"\"\n\nAddRequest\x12\t\n\x01\x61\x18\x01 \x01(\x05\x12\t\n\x01\x62\x18\x02 \x01(\x05\"\x17\n\x08\x41\x64\x64Reply\x12\x0b\n\x03sum\x18\x01 \x01(\x05\x32j\n\x05\x41\x64\x64\x65r\x12)\n\x03\x41\x64\x64\x12\x11.adder.AddRequest\x1a\x0f.adder.AddReply\x12\x36\n\x04Stop\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Emptyb\x06proto3'
-  ,
-  dependencies=[google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,])
+  serialized_pb=b'\n\x0b\x61\x64\x64\x65r.proto\x12\x05\x61\x64\x64\x65r\"\"\n\nAddRequest\x12\t\n\x01\x61\x18\x01 \x01(\x05\x12\t\n\x01\x62\x18\x02 \x01(\x05\"\x17\n\x08\x41\x64\x64Reply\x12\x0b\n\x03sum\x18\x01 \x01(\x05\x32\x32\n\x05\x41\x64\x64\x65r\x12)\n\x03\x41\x64\x64\x12\x11.adder.AddRequest\x1a\x0f.adder.AddReplyb\x06proto3'
+)
 
 
 
@@ -61,8 +59,8 @@ _ADDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=51,
-  serialized_end=85,
+  serialized_start=22,
+  serialized_end=56,
 )
 
 
@@ -93,8 +91,8 @@ _ADDREPLY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=87,
-  serialized_end=110,
+  serialized_start=58,
+  serialized_end=81,
 )
 
 DESCRIPTOR.message_types_by_name['AddRequest'] = _ADDREQUEST
@@ -124,8 +122,8 @@ _ADDER = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=112,
-  serialized_end=218,
+  serialized_start=83,
+  serialized_end=133,
   methods=[
   _descriptor.MethodDescriptor(
     name='Add',
@@ -134,16 +132,6 @@ _ADDER = _descriptor.ServiceDescriptor(
     containing_service=None,
     input_type=_ADDREQUEST,
     output_type=_ADDREPLY,
-    serialized_options=None,
-    create_key=_descriptor._internal_create_key,
-  ),
-  _descriptor.MethodDescriptor(
-    name='Stop',
-    full_name='adder.Adder.Stop',
-    index=1,
-    containing_service=None,
-    input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
-    output_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),
