@@ -138,8 +138,10 @@ function client_to_server_call ()
 
     if [[ ${signer} == "none" ]]; then
         signer_option=""
+    elif [[ ${signer} == "self" ]]; then
+        signer_option="--signer self"
     else
-        signer_option="--signer $signer"
+        signer_option="--signer ca"
     fi
 
     run_command "./server.py --authentication $authentication $signer_option" \

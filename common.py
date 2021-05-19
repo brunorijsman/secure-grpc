@@ -26,23 +26,17 @@ def parse_command_line_arguments(role):
     parser.add_argument(
         "--signer", "-i",
         type=str,
-        choices=["self", "root", "intermediate"],
+        choices=["self", "ca"],
         default="self",
-        help=("Signer for server and client certificates: self, root, or intermediate "
+        help=("Signer for server and client certificates: self or ca (certificate authority) "
               "(default: self)"))
     args = parser.parse_args()
     return args
 
 def authentication_and_signer_summary(args):
     assert args.authentication in ["none", "server", "mutual"]
-    assert args.signer in ["self", "root", "intermediate"]
+    assert args.signer in ["self", "ca"]
     if args.authentication == "none":
         return "No authentication"
     assert args.authentication in ["server", "mutual"]
-    if args.signer == "self":
-        signer_str = "self-signed"
-    elif args.signer == "intermediate":
-        signer_str = "intermediate CA signed"
-    else:
-        signer_str = "root CA signed"
-    return f"{args.authentication} {signer_str} authentication"
+    return f"{args.authentication} {args.signer}-signed authentication"
