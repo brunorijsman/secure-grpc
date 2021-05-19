@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# TODO: Add verbose option
-# TODO: Test error reporting (make something fail on purpose)
-
 FALSE=0
 TRUE=1
 
