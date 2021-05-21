@@ -141,3 +141,6 @@ dmypy.json
 keys/*
 certs/*
 admin/*
+
+# Copied requirements file for docker
+docker/requirements.txt
