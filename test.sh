@@ -9,6 +9,8 @@ GREEN=$(tput setaf 2)
 BLUE=$(tput setaf 4)
 
 VERBOSE=$FALSE
+SKIP_DOCKER=$FALSE
+SKIP_NEGATIVE=$FALSE
 TEST_CASES_FAILED=0
 
 function help ()
@@ -35,10 +37,20 @@ function help ()
     echo "  when some private key is incorrect, i.e. does not match the public key in the"
     echo "  certificate."
     echo
+    echo "  The tests are run in two environments: local and docker. The local test runs the server"
+    echo "  and client as local processes on localhost. The docker test runs the server and client"
+    echo "  in separate docker containers, each with a different hostname."
+    echo
     echo "OPTIONS"
     echo
     echo "  --help, -h, -?"
     echo "      Print this help and exit"
+    echo
+    echo "  --skip-docker"
+    echo "      Skip the docker test cases."
+    echo
+    echo "  --skip-negative"
+    echo "      Skip the negative test cases."
     echo
     echo "  --verbose, -v"
     echo "      Verbose output; show all executed commands and their output."
@@ -58,6 +70,12 @@ function parse_command_line_options ()
         case $1 in
             --help|-h|-\?)
                 help
+                ;;
+            --skip-docker)
+                SKIP_DOCKER=$TRUE
+                ;;
+            --skip-negative)
+                SKIP_NEGATIVE=$TRUE
                 ;;
             --verbose|-v)
                 VERBOSE=$TRUE
@@ -114,18 +132,26 @@ function run_command ()
 
 function create_keys_and_certs ()
 {
-    authentication=$1
-    signer=$2
-    wrong_key=$3
+    location=$1
+    authentication=$2
+    signer=$3
+    wrong_key=$4
 
-    if [[ ${signer} == "none" ]]; then
-        signer_option=""
-    else
-        signer_option="--signer $signer"
+    command="./create-keys-and-certs.sh"
+    command="$command --authentication $authentication"
+    if [[ ${signer} != "none" ]]; then
+        command="$command --signer $signer"
     fi
+    if [[ $location == local ]]; then
+        command="$command --server-host localhost"
+        command="$command --client-host localhost"
+    else
+        command="$command --server-host secure-grpc-server"
+        command="$command --client-host secure-grpc-client"
+    fi
+    command="$command --wrong-key $wrong_key"
 
-    run_command "./create-keys-and-certs.sh --authentication $authentication $signer_option --wrong-key $wrong_key" \
-                "Could not create private keys and certificates"
+    run_command "$command" "Could not create private keys and certificates"
 }
 
 function client_to_server_call ()
@@ -133,21 +159,40 @@ function client_to_server_call ()
     authentication=$1
     signer=$2
 
-    if [[ ${signer} == "none" ]]; then
-        signer_option=""
-    elif [[ ${signer} == "self" ]]; then
-        signer_option="--signer self"
+    options="--authentication $authentication"
+    if [[ $signer == "none" ]]; then
+        option="$options"
+    elif [[ $signer == "self" ]]; then
+        options="$options --signer self"
     else
-        signer_option="--signer ca"
+        options="$options --signer ca"
+    fi
+    if [[ $location == local ]]; then
+        options="$options --server-host localhost --client-host localhost"
+    else
+        options="$options --server-host secure-grpc-server --client-host secure-grpc-client"
     fi
 
-    run_command "./server.py --authentication $authentication $signer_option" \
-                "Could not start server" \
-                $TRUE
-    server_pid=$!
+    if [[ $location == local ]]; then
+        run_command "./server.py $options" "Could not start local server" $TRUE
+        server_pid=$!
+    else
+        run_command "docker/docker-server.sh $options" "Could not start docker server" $TRUE
+        server_pid=$!
+        server_container_id=""
+        while [[ $server_container_id == "" ]]; do
+            server_container_id=$(docker ps --filter name=secure-grpc-server --quiet)
+        done
+    fi
     sleep 0.2
 
-    if run_command "./client.py --authentication $authentication $signer_option" "return-error"; then
+    if [[ $location == local ]]; then
+        command="./client.py"
+    else
+        command="docker/docker-client.sh"
+    fi
+
+    if run_command "$command $options" "return-error"; then
         failure=$FALSE
     else
         failure=$TRUE
@@ -155,18 +200,23 @@ function client_to_server_call ()
 
     kill ${server_pid} 2>/dev/null
     wait ${server_pid} 2>/dev/null
+    if [[ $location == docker ]]; then
+        docker rm --force $server_container_id >/dev/null
+    fi
 
     return $failure
 }
 
 function correct_key_test_case ()
 {
-    authentication=$1
-    signer=$2
+    location=$1
+    authentication=$2
+    signer=$3
 
-    create_keys_and_certs $authentication $signer none
+    create_keys_and_certs $location $authentication $signer none
 
-    description="correct_key_test_case: authentication=$authentication signer=$signer"
+    description="correct_key_test_case: location=$location authentication=$authentication"
+    description="$description signer=$signer"
 
     if client_to_server_call $authentication $signer; then
         echo "${GREEN}Pass${NORMAL}: $description"
@@ -178,25 +228,28 @@ function correct_key_test_case ()
 
 function correct_key_test_cases ()
 {
-    correct_key_test_case none none
-    correct_key_test_case server self
-    correct_key_test_case server root
-    correct_key_test_case server intermediate
-    correct_key_test_case mutual self
-    correct_key_test_case mutual root
-    correct_key_test_case mutual intermediate
+    location=$1
+
+    correct_key_test_case $location none none
+    correct_key_test_case $location server self
+    correct_key_test_case $location server root
+    correct_key_test_case $location server intermediate
+    correct_key_test_case $location mutual self
+    correct_key_test_case $location mutual root
+    correct_key_test_case $location mutual intermediate
 }
 
 function wrong_key_test_case ()
 {
-    authentication=$1
-    signer=$2
-    wrong_key=$3
+    location=$1
+    authentication=$2
+    signer=$3
+    wrong_key=$4
 
-    create_keys_and_certs $authentication $signer $wrong_key
+    create_keys_and_certs $location $authentication $signer $wrong_key
 
-    description="wrong_key_test_case: authentication=$authentication signer=$signer"
-    description="$description wrong_key=$wrong_key"
+    description="wrong_key_test_case: location=$location authentication=$authentication"
+    description="$description signer=$signer wrong_key=$wrong_key"
 
     # Since the key is wrong, we expect the call to fail and the test case passes if the call fails
     if client_to_server_call $authentication $signer; then
@@ -209,27 +262,51 @@ function wrong_key_test_case ()
 
 function wrong_key_test_cases ()
 {
-    wrong_key_test_case server self server
-    wrong_key_test_case server root server
-    wrong_key_test_case server root root
-    wrong_key_test_case server intermediate server
-    wrong_key_test_case server intermediate root
-    wrong_key_test_case server intermediate intermediate
-    wrong_key_test_case mutual self server
-    wrong_key_test_case mutual self client
-    wrong_key_test_case mutual root server
-    wrong_key_test_case mutual root client
-    wrong_key_test_case mutual root root
-    wrong_key_test_case mutual intermediate server
-    wrong_key_test_case mutual intermediate client
-    wrong_key_test_case mutual intermediate root
-    wrong_key_test_case mutual intermediate intermediate
+    location=$1
+
+    wrong_key_test_case $location server self server
+    wrong_key_test_case $location server root server
+    wrong_key_test_case $location server root root
+    wrong_key_test_case $location server intermediate server
+    wrong_key_test_case $location server intermediate root
+    wrong_key_test_case $location server intermediate intermediate
+    wrong_key_test_case $location mutual self server
+    wrong_key_test_case $location mutual self client
+    wrong_key_test_case $location mutual root server
+    wrong_key_test_case $location mutual root client
+    wrong_key_test_case $location mutual root root
+    wrong_key_test_case $location mutual intermediate server
+    wrong_key_test_case $location mutual intermediate client
+    wrong_key_test_case $location mutual intermediate root
+    wrong_key_test_case $location mutual intermediate intermediate
+}
+
+function local_test_cases ()
+{
+    correct_key_test_cases local
+    if [[ $SKIP_NEGATIVE == $FALSE ]]; then
+        wrong_key_test_cases local
+    fi
+}
+
+function docker_test_cases ()
+{
+    correct_key_test_cases docker
+    if [[ $SKIP_NEGATIVE == $FALSE ]]; then
+        wrong_key_test_cases docker
+    fi
 }
 
 parse_command_line_options $@
 
-correct_key_test_cases
-wrong_key_test_cases
+local_test_cases
+
+if [[ $SKIP_DOCKER == $FALSE ]]; then
+    echo "Building container..."
+    run_command "docker/docker-build.sh" "Could not build container"
+    run_command "docker/docker-cleanup.sh" "Could not clean containers from previous run"
+    docker_test_cases
+fi
 
 if [[ $TEST_CASES_FAILED == 0 ]]; then
     echo "${GREEN}All test cases passed${NORMAL}"

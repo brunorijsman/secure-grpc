@@ -23,8 +23,6 @@ docker run \
     --ip 172.30.0.2 \
     --hostname secure-grpc-server \
     --volume ${SECURE_GRPC_PATH}:/host \
-    --interactive \
-    --tty \
     secure-grpc \
     bash -c "cd /host && python3 server.py --client-host secure-grpc-client \
              --server-host secure-grpc-server ${more_options}"
