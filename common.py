@@ -1,3 +1,6 @@
+# Copyright 2021 Bruno Rijsman
+# Apache License Version 2.0; see LICENSE for details
+
 import argparse
 
 def parse_command_line_arguments(role):

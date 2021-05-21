@@ -396,3 +396,10 @@ TODO: Update server code to update server certificate and private key
 * [grpclib GitHub Page](https://github.com/vmagamedov/grpclib) [Note]
 
 Note: This tutorial uses grpcio; it does not use grpclib.
+
+
+
+```
+Copyright 2021 Bruno Rijsman
+Apache License Version 2.0; see LICENSE for details
+```

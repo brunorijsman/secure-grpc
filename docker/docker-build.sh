@@ -1,3 +1,8 @@
+#!/bin/bash
+
+# Copyright 2021 Bruno Rijsman
+# Apache License Version 2.0; see LICENSE for details
+
 # Build a container for testing secure-grpc on something else than just localhost
 #
 # Note that this container does not actually include the secure-grpc code; instead it is intended

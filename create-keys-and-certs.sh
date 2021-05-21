@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Copyright 2021 Bruno Rijsman
+# Apache License Version 2.0; see LICENSE for details
+
 FALSE=0
 TRUE=1
 

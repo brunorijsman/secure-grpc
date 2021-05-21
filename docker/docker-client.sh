@@ -1,3 +1,8 @@
+#!/bin/bash
+
+# Copyright 2021 Bruno Rijsman
+# Apache License Version 2.0; see LICENSE for details
+
 if [ -z "${VIRTUAL_ENV}" ] ; then
     echo "Must run from Python virtual environment"
     exit 1
