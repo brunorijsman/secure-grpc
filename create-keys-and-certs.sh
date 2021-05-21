@@ -273,8 +273,8 @@ function create_ca_certificate ()
                     -in admin/${role}.csr \
                     -out certs/${role}.crt \
                     -config admin/${signer_role}.config \
-                    $maybe_self_sign \
                     -extfile admin/${role}_ca.ext \
+                    $maybe_self_sign \
                     -days $days" \
                 "Could not create ${role} certificate"
 
@@ -324,6 +324,7 @@ function create_leaf_private_key_and_self_signed_certificate ()
     {
         echo "[req]"
         echo "distinguished_name = req_distinguished_name"
+        echo "req_extensions     = req_ext"
         echo "prompt             = no"
         echo
         echo "[req_distinguished_name]"
@@ -332,6 +333,12 @@ function create_leaf_private_key_and_self_signed_certificate ()
         echo "organizationName       = ${ORGANIZATION_NAME}"
         echo "organizationalUnitName = ${ORGANIZATIONAL_UNIT_NAME}"
         echo "commonName             = ${common_name}"
+        echo
+        echo "[req_ext]"
+        echo "subjectAltName = @alt_names"
+        echo
+        echo "[alt_names]"
+        echo "DNS.1 = ${common_name}"
     } >admin/${role}_req.config
 
     run_command "openssl req \
@@ -342,6 +349,7 @@ function create_leaf_private_key_and_self_signed_certificate ()
                     -keyout keys/${role}.key \
                     -out certs/${role}.crt \
                     -config admin/${role}_req.config \
+                    -extensions req_ext \
                     -days $days" \
                 "Could not create ${role} certificate"
 
