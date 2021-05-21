@@ -315,7 +315,8 @@ function create_leaf_ca_signed_certificate ()
 function create_leaf_private_key_and_self_signed_certificate ()
 {
     role="$1"
-    days="$2"
+    common_name="$2"
+    days="$3"
 
     mkdir -p certs
     mkdir -p admin
@@ -390,7 +391,7 @@ function create_leaf_credentials ()
     days="$4"
 
     if [[ $signer_role == "self" || $signer_role == $role ]]; then
-        create_leaf_private_key_and_self_signed_certificate $role $days
+        create_leaf_private_key_and_self_signed_certificate $role "$common_name" $days
     else
         create_private_key $role
         create_certificate_signing_request $role "$common_name"
