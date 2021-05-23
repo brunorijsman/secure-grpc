@@ -34,7 +34,7 @@ async def main():
     args = common.parse_command_line_arguments("server")
     print(f"Server: {common.authentication_and_signer_summary(args)}")
     server = grpc.aio.server()
-    server_address = f"{args.SERVER_NAME}:{args.server_port}"
+    server_address = f"{args.server_name}:{args.server_port}"
     if args.authentication == "none":
         server.add_insecure_port(server_address)
     else:
