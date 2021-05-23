@@ -193,12 +193,14 @@ function create_certificate_signing_request ()
 {
     role="$1"
     common_name="$2"
+    dns_name="$3"
 
     mkdir -p admin
 
     {
         echo "[req]"
         echo "distinguished_name = req_distinguished_name"
+        echo "req_extensions     = req_ext"
         echo "prompt             = no"
         echo
         echo "[req_distinguished_name]"
@@ -207,13 +209,23 @@ function create_certificate_signing_request ()
         echo "organizationName       = ${ORGANIZATION_NAME}"
         echo "organizationalUnitName = ${ORGANIZATIONAL_UNIT_NAME}"
         echo "commonName             = ${common_name}"
+        echo
+        echo "[req_ext]"
+        if [[ $dns_name != "" ]]; then
+            echo "subjectAltName = @alt_names"
+            echo
+            echo "[alt_names]"
+            echo "DNS.1 = ${dns_name}"
+        fi
     } >admin/${role}_req.config
 
     run_command "openssl req \
                     -new \
+                    -text \
                     -key keys/${role}.key \
                     -out admin/${role}.csr \
-                    -config admin/${role}_req.config" \
+                    -config admin/${role}_req.config \
+                    -extensions req_ext" \
                 "Could not create ${role} certificate signing request"
 
     echo "Created ${role} certificate signing request"
@@ -245,7 +257,7 @@ function create_ca_certificate ()
         echo "policy          = policy_any"
         echo "email_in_dn     = no"
         echo "unique_subject  = no"
-        echo "copy_extensions = none"
+        echo "copy_extensions = copy"
         echo "default_md      = sha256"
         echo
         echo "[policy_any]"
@@ -301,11 +313,18 @@ function create_leaf_ca_signed_certificate ()
 
     mkdir -p certs
 
+    {
+        echo "[default]"
+        echo "basicConstraints = critical, CA:false"
+        echo "keyUsage         = critical, digitalSignature, keyEncipherment"
+    } >admin/${role}_leaf.ext
+
     run_command "openssl ca \
                     -batch \
                     -in admin/${role}.csr \
                     -out certs/${role}.crt \
                     -config admin/${signer_role}.config \
+                    -extfile admin/${role}_leaf.ext \
                     -days $days" \
                 "Could not create ${role} certificate"
 
@@ -356,25 +375,6 @@ function create_leaf_private_key_and_self_signed_certificate ()
     echo "Created ${role} certificate (self-signed)"
 }
 
-function create_leaf_self_signed_certificate ()
-{
-    role="$1"
-    signer_role="$2"
-    days="$3"
-
-    mkdir -p certs
-
-    run_command "openssl ca \
-                    -batch \
-                    -in admin/${role}.csr \
-                    -out certs/${role}.crt \
-                    -config admin/${signer_role}.config \
-                    -days $days" \
-                "Could not create ${role} certificate"
-
-    echo "Created ${role} certificate (signed by ${signer_role})"
-}
-
 function create_leaf_certificate_chain ()
 {
     role="$1"
@@ -402,7 +402,7 @@ function create_leaf_credentials ()
         create_leaf_private_key_and_self_signed_certificate $role "$common_name" $days
     else
         create_private_key $role
-        create_certificate_signing_request $role "$common_name"
+        create_certificate_signing_request $role "$common_name" "$common_name"
         create_leaf_ca_signed_certificate $role $signer_role $days
     fi
 
