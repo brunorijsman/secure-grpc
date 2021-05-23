@@ -25,7 +25,7 @@ def make_credentials(args):
         else:
             root_certificate_for_client = open("certs/root.crt", "br").read()
         credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs,
-                                                root_certificate_for_client, True)
+                                                  root_certificate_for_client, True)
     else:
         credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs)
     return credentials
