@@ -26,7 +26,7 @@ def make_credentials(args):
 async def main():
     args = common.parse_command_line_arguments("server")
     print(f"Client: {common.authentication_and_signer_summary(args)}")
-    server_address = f"{args.server_host}:{args.server_port}"
+    server_address = f"{args.SERVER_NAME}:{args.server_port}"
     if args.authentication == "none":
         channel = grpc.aio.insecure_channel(server_address)
     else:

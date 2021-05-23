@@ -20,5 +20,5 @@ docker run \
     --hostname secure-grpc-client \
     --volume ${SECURE_GRPC_PATH}:/host \
     secure-grpc \
-    bash -c "cd /host && python3 client.py --client-host secure-grpc-client \
-             --server-host secure-grpc-server ${more_options}"
+    bash -c "cd /host && python3 client.py --client-name secure-grpc-client \
+             --server-name secure-grpc-server ${more_options}"

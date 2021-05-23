@@ -39,7 +39,7 @@ function help ()
     echo
     echo "  The tests are run in two environments: local and docker. The local test runs the server"
     echo "  and client as local processes on localhost. The docker test runs the server and client"
-    echo "  in separate docker containers, each with a different hostname."
+    echo "  in separate docker containers, each with a different DNS name."
     echo
     echo "OPTIONS"
     echo
@@ -143,11 +143,11 @@ function create_keys_and_certs ()
         command="$command --signer $signer"
     fi
     if [[ $location == local ]]; then
-        command="$command --server-host localhost"
-        command="$command --client-host localhost"
+        command="$command --server-name localhost"
+        command="$command --client-name localhost"
     else
-        command="$command --server-host secure-grpc-server"
-        command="$command --client-host secure-grpc-client"
+        command="$command --server-name secure-grpc-server"
+        command="$command --client-name secure-grpc-client"
     fi
     command="$command --wrong-key $wrong_key"
 
@@ -168,9 +168,9 @@ function client_to_server_call ()
         options="$options --signer ca"
     fi
     if [[ $location == local ]]; then
-        options="$options --server-host localhost --client-host localhost"
+        options="$options --server-name localhost --client-name localhost"
     else
-        options="$options --server-host secure-grpc-server --client-host secure-grpc-client"
+        options="$options --server-name secure-grpc-server --client-name secure-grpc-client"
     fi
 
     if [[ $location == local ]]; then

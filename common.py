@@ -9,15 +9,15 @@ def parse_command_line_arguments(role):
         default="none",
         help="Authentication: none, server, or mutual (default: none)")
     parser.add_argument(
-        "--client-host", "-c",
+        "--client-name", "-c",
         type=str,
         default="localhost",
-        help="The client hostname (default: localhost)")
+        help="The client name (default: localhost)")
     parser.add_argument(
-        "--server-host", "-s",
+        "--server-name", "-s",
         type=str,
         default="localhost",
-        help="The server hostname (default: localhost)")
+        help="The server name (default: localhost)")
     parser.add_argument(
         "--server-port", "-p",
         type=int,

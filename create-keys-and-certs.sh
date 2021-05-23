@@ -10,8 +10,8 @@ BEEP=$(tput bel)
 
 AUTHENTICATION="none"
 CLEAN=${FALSE}
-CLIENT_HOST="localhost"
-SERVER_HOST="localhost"
+CLIENT_NAME="localhost"
+SERVER_NAME="localhost"
 SIGNER="self"
 WRONG_KEY="none"
 
@@ -55,10 +55,10 @@ function help ()
     echo "      mutual: the client and the server mutually authenticate each other."
     echo "      (Default: none)"
     echo
-    echo "  --client-host, -c"
+    echo "  --client-name, -c"
     echo "      The client hostname. Default: localhost."
     echo
-    echo "  --server-host, -s"
+    echo "  --server-name, -s"
     echo "      The server hostname. Default: localhost."
     echo
     echo "  --signer {self, root, intermediate}, -i {self, root, intermediate}"
@@ -111,12 +111,12 @@ function parse_command_line_options ()
             --clean|-x)
                 CLEAN=${TRUE}
                 ;;
-            --client-host|-c)
-                CLIENT_HOST="$2"
+            --client-name|-c)
+                CLIENT_NAME="$2"
                 shift
                 ;;
-            --server-host|-s)
-                SERVER_HOST="$2"
+            --server-name|-s)
+                SERVER_NAME="$2"
                 shift
                 ;;
             --signer|-i)
@@ -426,10 +426,10 @@ if [[ "$SIGNER" == "intermediate" ]]; then
     create_ca_credentials intermediate root "$INTERMEDIATE_CA_COMMON_NAME" $INTERMEDIATE_DAYS
 fi
 
-create_leaf_credentials server $SIGNER "$SERVER_HOST" $LEAF_DAYS
+create_leaf_credentials server $SIGNER "$SERVER_NAME" $LEAF_DAYS
 
 if [[ "$AUTHENTICATION" == "mutual" ]]; then
-    create_leaf_credentials client $SIGNER "$CLIENT_HOST" $LEAF_DAYS
+    create_leaf_credentials client $SIGNER "$CLIENT_NAME" $LEAF_DAYS
 fi
 
 case $WRONG_KEY in
