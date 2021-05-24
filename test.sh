@@ -9,6 +9,7 @@ GREEN=$(tput setaf 2)
 BLUE=$(tput setaf 4)
 
 VERBOSE=$FALSE
+SKIP_EVANS=$FALSE
 SKIP_DOCKER=$FALSE
 SKIP_NEGATIVE=$FALSE
 TEST_CASES_FAILED=0
@@ -41,10 +42,16 @@ function help ()
     echo "  and client as local processes on localhost. The docker test runs the server and client"
     echo "  in separate docker containers, each with a different DNS name."
     echo
+    echo "  We use two different clients for testing: client.py in this repo and Evans"
+    echo "  (https://github.com/ktr0731/evans)"
+    echo
     echo "OPTIONS"
     echo
     echo "  --help, -h, -?"
     echo "      Print this help and exit"
+    echo
+    echo "  --skip-evans"
+    echo "      Skip the Evans client test cases."
     echo
     echo "  --skip-docker"
     echo "      Skip the docker test cases."
@@ -59,7 +66,8 @@ function help ()
 
 function fatal_error ()
 {
-    message="$1"
+    local message="$1"
+
     echo "${RED}Error:${NORMAL} ${message}" >&2
     exit 1
 }
@@ -90,33 +98,20 @@ function parse_command_line_options ()
 
 function run_command ()
 {
-    command="$1"
-    failure_msg="$2"
-    run_in_background="$3"
+    local command=$1
+    local failure_msg="$2"
 
-    if [[ $run_in_background == $TRUE ]]; then
-        if [[ $VERBOSE == $TRUE ]]; then
-            echo "Execute background command:"
-            echo "${BLUE}${command} &${NORMAL}"
-            echo "Background command start output:"
-            echo ${BLUE}
-            $command &
-            echo ${NORMAL}
-        else
-            $command >/dev/null 2>&1 &
-        fi
-        return 0
-    fi
-
+    local status
     if [[ $VERBOSE == $TRUE ]]; then
+        local output
         echo "Execute command:"
         echo "${BLUE}${command}${NORMAL}"
-        output=$($command)
+        output="$(eval $command)"
         status=$?
         echo "Command output:"
         echo "${BLUE}${output}${NORMAL}"
     else
-        $command >/dev/null 2>&1
+        (eval $command) >/dev/null 2>&1
         status=$?
     fi
 
@@ -130,14 +125,35 @@ function run_command ()
     return 0
 }
 
+function start_process ()
+{
+    local command="$1"
+    local pid_return_var="$2"
+
+    local start_process_pid
+    if [[ $VERBOSE == $TRUE ]]; then
+        echo "Execute background command:"
+        echo "${BLUE}${command} &${NORMAL}"
+        echo "Background command start output:"
+        echo ${BLUE}
+        $command &
+        start_process_pid=$!
+        echo ${NORMAL}
+    else
+        $command >/dev/null 2>&1 &
+        start_process_pid=$!
+    fi
+    eval $pid_return_var="'$start_process_pid'"
+}
+
 function create_keys_and_certs ()
 {
-    location=$1
-    authentication=$2
-    signer=$3
-    wrong_key=$4
+    local location=$1
+    local authentication=$2
+    local signer=$3
+    local wrong_key=$4
 
-    command="./create-keys-and-certs.sh"
+    local command="./create-keys-and-certs.sh"
     command="$command --authentication $authentication"
     if [[ ${signer} != "none" ]]; then
         command="$command --signer $signer"
@@ -154,18 +170,20 @@ function create_keys_and_certs ()
     run_command "$command" "Could not create private keys and certificates"
 }
 
-function client_to_server_call ()
+function start_server ()
 {
-    authentication=$1
-    signer=$2
+    local location=$1
+    local authentication=$2
+    local signer=$3
+    local server_pid_return_var=$4
 
-    options="--authentication $authentication"
-    if [[ $signer == "none" ]]; then
-        option="$options"
-    elif [[ $signer == "self" ]]; then
-        options="$options --signer self"
-    else
-        options="$options --signer ca"
+    local options="--authentication $authentication"
+    if [[ $authentication != "none" ]]; then
+        if [[ $signer == "self" ]]; then
+            options="$options --signer self"
+        else
+            options="$options --signer ca"
+        fi
     fi
     if [[ $location == local ]]; then
         options="$options --server-name localhost --client-name localhost"
@@ -173,52 +191,145 @@ function client_to_server_call ()
         options="$options --server-name secure-grpc-server --client-name secure-grpc-client"
     fi
 
+    local start_server_pid
     if [[ $location == local ]]; then
-        run_command "./server.py $options" "Could not start local server" $TRUE
-        server_pid=$!
+        start_process "./server.py $options" start_server_pid
     else
-        run_command "docker/docker-server.sh $options" "Could not start docker server" $TRUE
-        server_pid=$!
-        server_container_id=""
+        start_process "docker/docker-server.sh $options" start_server_pid
+        local server_container_id=""
         while [[ $server_container_id == "" ]]; do
             server_container_id=$(docker ps --filter name=secure-grpc-server --quiet)
         done
     fi
     sleep 0.2
 
+    eval $server_pid_return_var="'$start_server_pid'"
+}
+
+function stop_server ()
+{
+    local location=$1
+    local server_pid=$2
+
+    kill ${server_pid} 2>/dev/null
+    wait ${server_pid} 2>/dev/null
+    if [[ $location == docker ]]; then
+        local server_container_id=$(docker ps --filter name=secure-grpc-server --quiet)
+        if [[ $server_container_id != "" ]]; then
+            docker rm --force $server_container_id >/dev/null
+        fi
+    fi
+}
+
+function python_client_to_server_call ()
+{
+    local location=$1
+    local client=$2
+    local authentication=$3
+    local signer=$4
+
+    start_server $location $authentication $signer server_pid
+    
+    local command
     if [[ $location == local ]]; then
         command="./client.py"
     else
         command="docker/docker-client.sh"
     fi
+    command="$command --authentication $authentication"
+    if [[ $signer == "none" ]]; then
+        :
+    elif [[ $signer == "self" ]]; then
+        command="$command --signer self"
+    else
+        command="$command --signer ca"
+    fi
+    if [[ $location == local ]]; then
+        command="$command --server-name localhost --client-name localhost"
+    else
+        command="$command --server-name secure-grpc-server --client-name secure-grpc-client"
+    fi
 
-    if run_command "$command $options" "return-error"; then
+    local failure
+    if run_command "$command" "return-error"; then
         failure=$FALSE
     else
         failure=$TRUE
     fi
 
-    kill ${server_pid} 2>/dev/null
-    wait ${server_pid} 2>/dev/null
-    if [[ $location == docker ]]; then
-        docker rm --force $server_container_id >/dev/null
-    fi
+    stop_server $location $server_pid
 
     return $failure
 }
 
+function evans_client_to_server_call ()
+{
+    local location=$1
+    local client=$2
+    local authentication=$3
+    local signer=$4
+
+    start_server $location $authentication $signer server_pid
+
+    local command
+    if [[ $location == local ]]; then
+        command="evans --proto adder.proto cli call --host localhost"
+    else
+        command="docker/docker-evans.sh"
+    fi
+    if [[ $authentication != "none" ]]; then
+        command="$command --tls"
+        if [[ $signer == "self" ]]; then
+            command="$command --cacert certs/server.crt"
+        else
+            command="$command --cacert certs/root.crt"
+        fi
+        if [[ $authentication == "mutual" ]]; then
+            command="$command --cert certs/client.pem --certkey keys/client.key"
+        fi
+    fi
+    command="$command adder.Adder.Add"
+    command="$command <<< '{\"a\": \"1\", \"b\":\"2\"}'"
+    
+    local failure
+    if run_command "$command" "return-error"; then
+        failure=$FALSE
+    else
+        failure=$TRUE
+    fi
+
+    stop_server $location $server_pid
+
+    return $failure
+}
+
+function client_to_server_call ()
+{
+    local location=$1
+    local client=$2
+    local authentication=$3
+    local signer=$4
+
+    if [[ $client == python ]]; then
+        python_client_to_server_call $location $client $authentication $signer
+    else
+        evans_client_to_server_call $location $client $authentication $signer
+    fi
+}
+
 function correct_key_test_case ()
 {
-    location=$1
-    authentication=$2
-    signer=$3
+    local location=$1
+    local client=$2
+    local authentication=$3
+    local signer=$4
 
     create_keys_and_certs $location $authentication $signer none
 
-    description="correct_key_test_case: location=$location authentication=$authentication"
-    description="$description signer=$signer"
+    description="correct_key_test_case: location=$location client=$client"
+    description="$description authentication=$authentication signer=$signer"
 
-    if client_to_server_call $authentication $signer; then
+    if client_to_server_call $location $client $authentication $signer; then
         echo "${GREEN}Pass${NORMAL}: $description"
     else
         echo "${RED}Fail${NORMAL}: $description"
@@ -228,23 +339,24 @@ function correct_key_test_case ()
 
 function correct_key_test_cases ()
 {
-    location=$1
+    local location=$1
+    local client=$2
 
-    correct_key_test_case $location none none
-    correct_key_test_case $location server self
-    correct_key_test_case $location server root
-    correct_key_test_case $location server intermediate
-    correct_key_test_case $location mutual self
-    correct_key_test_case $location mutual root
-    correct_key_test_case $location mutual intermediate
+    correct_key_test_case $location $client none none
+    correct_key_test_case $location $client server self
+    correct_key_test_case $location $client server root
+    correct_key_test_case $location $client server intermediate
+    correct_key_test_case $location $client mutual self
+    correct_key_test_case $location $client mutual root
+    correct_key_test_case $location $client mutual intermediate
 }
 
 function wrong_key_test_case ()
 {
-    location=$1
-    authentication=$2
-    signer=$3
-    wrong_key=$4
+    local location=$1
+    local authentication=$2
+    local signer=$3
+    local wrong_key=$4
 
     create_keys_and_certs $location $authentication $signer $wrong_key
 
@@ -252,7 +364,7 @@ function wrong_key_test_case ()
     description="$description signer=$signer wrong_key=$wrong_key"
 
     # Since the key is wrong, we expect the call to fail and the test case passes if the call fails
-    if client_to_server_call $authentication $signer; then
+    if client_to_server_call $location python $authentication $signer; then
         echo "${RED}Fail${NORMAL}: $description"
         ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     else
@@ -262,7 +374,7 @@ function wrong_key_test_case ()
 
 function wrong_key_test_cases ()
 {
-    location=$1
+    local location=$1
 
     wrong_key_test_case $location server self server
     wrong_key_test_case $location server root server
@@ -283,7 +395,10 @@ function wrong_key_test_cases ()
 
 function local_test_cases ()
 {
-    correct_key_test_cases local
+    correct_key_test_cases local python
+    if [[ $SKIP_EVANS == $FALSE ]]; then
+        correct_key_test_cases local evans
+    fi
     if [[ $SKIP_NEGATIVE == $FALSE ]]; then
         wrong_key_test_cases local
     fi
@@ -291,9 +406,13 @@ function local_test_cases ()
 
 function docker_test_cases ()
 {
-    correct_key_test_cases docker
+    correct_key_test_cases docker python
+    if [[ $SKIP_EVANS == $FALSE ]]; then
+        correct_key_test_cases docker evans
+    fi
     if [[ $SKIP_NEGATIVE == $FALSE ]]; then
-        wrong_key_test_cases docker
+        wrong_key_test_cases docker local
+        wrong_key_test_cases docker evans
     fi
 }
 

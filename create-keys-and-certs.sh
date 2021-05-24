@@ -87,7 +87,8 @@ function help ()
 
 function fatal_error ()
 {
-    message="$1"
+    local message="$1"
+
     echo "${RED}Error:${NORMAL} ${message}" >&2
     exit 1
 }
@@ -151,8 +152,9 @@ function parse_command_line_options ()
 
 function run_command ()
 {
-    command="$1"
-    failure_msg="$2"
+    local command="$1"
+    local failure_msg="$2"
+
     output=$(${command} 2>&1)
     if [ $? -ne 0 ] ; then
         echo "${RED}Error:${NORMAL} $failure_msg:"
@@ -176,7 +178,8 @@ function clean_previous_run ()
 
 function create_private_key ()
 {
-    role="$1"
+    local role="$1"
+
     mkdir -p keys
     run_command "openssl genrsa \
                     -out keys/${role}.key \
@@ -188,9 +191,9 @@ function create_private_key ()
 
 function create_certificate_signing_request ()
 {
-    role="$1"
-    common_name="$2"
-    dns_name="$3"
+    local role="$1"
+    local common_name="$2"
+    local dns_name="$3"
 
     mkdir -p admin
 
@@ -230,9 +233,9 @@ function create_certificate_signing_request ()
 
 function create_ca_certificate ()
 {
-    role="$1"
-    signer_role="$2"
-    days="$3"
+    local role="$1"
+    local signer_role="$2"
+    local days="$3"
 
     mkdir -p admin
     mkdir -p admin/${role}
@@ -292,10 +295,10 @@ function create_ca_certificate ()
 
 function create_ca_credentials ()
 {
-    role="$1"
-    signer_role="$2"
-    common_name="$3"
-    days="$4"
+    local role="$1"
+    local signer_role="$2"
+    local common_name="$3"
+    local days="$4"
 
     create_private_key $role
     create_certificate_signing_request $role "$common_name"
@@ -304,9 +307,9 @@ function create_ca_credentials ()
 
 function create_leaf_ca_signed_certificate ()
 {
-    role="$1"
-    signer_role="$2"
-    days="$3"
+    local role="$1"
+    local signer_role="$2"
+    local days="$3"
 
     mkdir -p certs
 
@@ -330,9 +333,9 @@ function create_leaf_ca_signed_certificate ()
 
 function create_leaf_private_key_and_self_signed_certificate ()
 {
-    role="$1"
-    common_name="$2"
-    days="$3"
+    local role="$1"
+    local common_name="$2"
+    local days="$3"
 
     mkdir -p certs
     mkdir -p admin
@@ -374,8 +377,8 @@ function create_leaf_private_key_and_self_signed_certificate ()
 
 function create_leaf_certificate_chain ()
 {
-    role="$1"
-    signer_role="$2"
+    local role="$1"
+    local signer_role="$2"
 
     if [[ $signer_role == "root" ]]; then
         cat certs/${role}.crt certs/root.crt >certs/${role}.pem
@@ -390,10 +393,10 @@ function create_leaf_certificate_chain ()
 
 function create_leaf_credentials ()
 {
-    role="$1"
-    signer_role="$2"
-    common_name="$3"
-    days="$4"
+    local role="$1"
+    local signer_role="$2"
+    local common_name="$3"
+    local days="$4"
 
     if [[ $signer_role == "self" || $signer_role == $role ]]; then
         create_leaf_private_key_and_self_signed_certificate $role "$common_name" $days
