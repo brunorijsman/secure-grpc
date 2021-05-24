@@ -1,6 +1,5 @@
 import argparse
 
-# TODO: Command-line options to force TLS 1.2
 # TODO: Can server determine client-name in certificate from context?
 # TODO: If yes, add command-line option to let server validate client-name.
 
