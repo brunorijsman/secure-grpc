@@ -24,7 +24,7 @@ def make_credentials(args):
     return credentials
 
 async def main():
-    args = common.parse_command_line_arguments("server")
+    args = common.parse_command_line_arguments("client")
     print(f"Client: {common.authentication_and_signer_summary(args)}")
     server_address = f"{args.server_host}:{args.server_port}"
     if args.authentication == "none":

@@ -26,5 +26,4 @@ docker run \
     --hostname adder-server-host \
     --volume ${SECURE_GRPC_PATH}:/host \
     secure-grpc \
-    bash -c "cd /host && python3 server.py --client-host adder-client-host \
-             --server-host adder-server-host ${more_options}"
+    bash -c "cd /host && python3 server.py --server-host adder-server-host ${more_options}"

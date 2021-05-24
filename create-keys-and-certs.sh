@@ -25,10 +25,6 @@ ROOT_DAYS=1095
 INTERMEDIATE_DAYS=730
 LEAF_DAYS=365
 
-# TODO: Support subject alternative names (SAN)
-# See https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/ for
-# instructions on how to use config files to achieve that.
-
 function help ()
 {
     echo

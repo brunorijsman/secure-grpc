@@ -143,7 +143,7 @@ function start_process ()
     local start_process_pid
     if [[ $VERBOSE == $TRUE ]]; then
         echo "Execute background command:"
-        echo "${BLUE}${command} &${NORMAL}"
+        echo "${BLUE}${command} 2>&1 &${NORMAL}"
         echo "Background command start output:"
         echo ${BLUE}
         $command &
@@ -205,9 +205,9 @@ function start_server ()
         fi
     fi
     if [[ $location == local ]]; then
-        options="$options --server-host localhost --client-host localhost"
+        options="$options --server-host localhost"
     else
-        options="$options --server-host adder-server-host --client-host adder-client-host"
+        options="$options --server-host adder-server-host"
     fi
 
     local start_server_pid
@@ -265,9 +265,9 @@ function python_client_to_server_call ()
         command="$command --signer ca"
     fi
     if [[ $location == local ]]; then
-        command="$command --server-host localhost --client-host localhost"
+        command="$command --server-host localhost"
     else
-        command="$command --server-host adder-server-host --client-host adder-client-host"
+        command="$command --server-host adder-server-host"
     fi
     if [[ $override_name == $TRUE ]]; then
         command="$command --server-name adder-server-service"

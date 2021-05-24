@@ -1,7 +1,6 @@
 import argparse
 
 # TODO: Command-line options to force TLS 1.2
-# TODO: Does server currently use client-name for anything? What if it is different from the hostname?
 # TODO: Can server determine client-name in certificate from context?
 # TODO: If yes, add command-line option to let server validate client-name.
 
@@ -13,11 +12,6 @@ def parse_command_line_arguments(role):
         choices=["none", "server", "mutual"],
         default="none",
         help="Authentication: none, server, or mutual (default: none)")
-    parser.add_argument(
-        "--client-host", "-c",
-        type=str,
-        default="localhost",
-        help="The client host name (default: localhost)")
     parser.add_argument(
         "--server-host", "-s",
         type=str,
