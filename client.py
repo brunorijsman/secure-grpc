@@ -26,12 +26,16 @@ def make_credentials(args):
 async def main():
     args = common.parse_command_line_arguments("server")
     print(f"Client: {common.authentication_and_signer_summary(args)}")
-    server_address = f"{args.server_name}:{args.server_port}"
+    server_address = f"{args.server_host}:{args.server_port}"
     if args.authentication == "none":
         channel = grpc.aio.insecure_channel(server_address)
     else:
         credentials = make_credentials(args)
-        channel = grpc.aio.secure_channel(server_address, credentials)
+        if args.server_name is None:
+            options = None
+        else:
+            options = (("grpc.ssl_target_name_override", args.server_name),)
+        channel = grpc.aio.secure_channel(server_address, credentials, options)
     stub = adder_pb2_grpc.AdderStub(channel)
     print(f"Client: connect to {server_address}")
     a = random.randint(1, 10001)

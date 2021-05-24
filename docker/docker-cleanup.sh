@@ -1,11 +1,11 @@
 #!/bin/bash
 
-if [[ $(docker ps --filter name=secure-grpc-server --quiet) != "" ]]; then
-    docker rm secure-grpc-server >/dev/null 2>&1
+if [[ $(docker ps --filter name=adder-server-host --quiet) != "" ]]; then
+    docker rm --force adder-server-host >/dev/null
 fi
-if [[ $(docker ps --filter name=secure-grpc-client --quiet) != "" ]]; then
-    docker rm secure-grpc-client >/dev/null 2>&1
+if [[ $(docker ps --filter name=adder-client-host --quiet) != "" ]]; then
+    docker rm --force adder-client-host >/dev/null
 fi
 if [[ $(docker network ls --filter name=secure-grpc-net --quiet) != "" ]]; then
-    docker network rm secure-grpc-net >/dev/null 2>&1
+    docker network rm secure-grpc-net >/dev/null
 fi

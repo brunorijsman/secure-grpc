@@ -14,6 +14,9 @@ SKIP_DOCKER=$FALSE
 SKIP_NEGATIVE=$FALSE
 TEST_CASES_FAILED=0
 
+DO_OVERRIDE_NAME=$TRUE
+DONT_OVERRIDE_NAME=$FALSE
+
 function help ()
 {
     echo
@@ -41,6 +44,10 @@ function help ()
     echo "  The tests are run in two environments: local and docker. The local test runs the server"
     echo "  and client as local processes on localhost. The docker test runs the server and client"
     echo "  in separate docker containers, each with a different DNS name."
+    echo
+    echo "  The server can identify itself using the DNS name of the host on which it runs, or"
+    echo "  it can use the TLS server name indication (SNI) to identify itself using a service"
+    echo "  name."
     echo
     echo "  We use two different clients for testing: client.py in this repo and Evans"
     echo "  (https://github.com/ktr0731/evans)"
@@ -81,6 +88,9 @@ function parse_command_line_options ()
                 ;;
             --skip-docker)
                 SKIP_DOCKER=$TRUE
+                ;;
+            --skip-evans)
+                SKIP_EVANS=$TRUE
                 ;;
             --skip-negative)
                 SKIP_NEGATIVE=$TRUE
@@ -152,6 +162,7 @@ function create_keys_and_certs ()
     local authentication=$2
     local signer=$3
     local wrong_key=$4
+    local override_name=$5
 
     local command="./create-keys-and-certs.sh"
     command="$command --authentication $authentication"
@@ -159,11 +170,19 @@ function create_keys_and_certs ()
         command="$command --signer $signer"
     fi
     if [[ $location == local ]]; then
-        command="$command --server-name localhost"
+        if [[ $override_name == $TRUE ]]; then
+            command="$command --server-name adder-server-service"
+        else
+            command="$command --server-name localhost"
+        fi
         command="$command --client-name localhost"
     else
-        command="$command --server-name secure-grpc-server"
-        command="$command --client-name secure-grpc-client"
+        if [[ $override_name == $TRUE ]]; then
+            command="$command --server-name adder-server-service"
+        else
+            command="$command --server-name adder-server-host"
+        fi
+        command="$command --client-name adder-client-host"
     fi
     command="$command --wrong-key $wrong_key"
 
@@ -186,9 +205,9 @@ function start_server ()
         fi
     fi
     if [[ $location == local ]]; then
-        options="$options --server-name localhost --client-name localhost"
+        options="$options --server-host localhost --client-host localhost"
     else
-        options="$options --server-name secure-grpc-server --client-name secure-grpc-client"
+        options="$options --server-host adder-server-host --client-host adder-client-host"
     fi
 
     local start_server_pid
@@ -198,7 +217,7 @@ function start_server ()
         start_process "docker/docker-server.sh $options" start_server_pid
         local server_container_id=""
         while [[ $server_container_id == "" ]]; do
-            server_container_id=$(docker ps --filter name=secure-grpc-server --quiet)
+            server_container_id=$(docker ps --filter name=adder-server-host --quiet)
         done
     fi
     sleep 0.2
@@ -214,7 +233,7 @@ function stop_server ()
     kill ${server_pid} 2>/dev/null
     wait ${server_pid} 2>/dev/null
     if [[ $location == docker ]]; then
-        local server_container_id=$(docker ps --filter name=secure-grpc-server --quiet)
+        local server_container_id=$(docker ps --filter name=adder-server-host --quiet)
         if [[ $server_container_id != "" ]]; then
             docker rm --force $server_container_id >/dev/null
         fi
@@ -227,6 +246,7 @@ function python_client_to_server_call ()
     local client=$2
     local authentication=$3
     local signer=$4
+    local override_name=$5
 
     start_server $location $authentication $signer server_pid
     
@@ -245,9 +265,12 @@ function python_client_to_server_call ()
         command="$command --signer ca"
     fi
     if [[ $location == local ]]; then
-        command="$command --server-name localhost --client-name localhost"
+        command="$command --server-host localhost --client-host localhost"
     else
-        command="$command --server-name secure-grpc-server --client-name secure-grpc-client"
+        command="$command --server-host adder-server-host --client-host adder-client-host"
+    fi
+    if [[ $override_name == $TRUE ]]; then
+        command="$command --server-name adder-server-service"
     fi
 
     local failure
@@ -268,6 +291,7 @@ function evans_client_to_server_call ()
     local client=$2
     local authentication=$3
     local signer=$4
+    local override_name=$5
 
     start_server $location $authentication $signer server_pid
 
@@ -287,9 +311,14 @@ function evans_client_to_server_call ()
         if [[ $authentication == "mutual" ]]; then
             command="$command --cert certs/client.pem --certkey keys/client.key"
         fi
+        if [[ $override_name == $TRUE ]]; then
+            command="$command --servername adder-server-service"
+        fi
     fi
-    command="$command adder.Adder.Add"
-    command="$command <<< '{\"a\": \"1\", \"b\":\"2\"}'"
+    if [[ $location == local ]]; then
+        command="$command adder.Adder.Add"
+        command="$command <<< '{\"a\": \"1\", \"b\":\"2\"}'"
+    fi
     
     local failure
     if run_command "$command" "return-error"; then
@@ -309,11 +338,12 @@ function client_to_server_call ()
     local client=$2
     local authentication=$3
     local signer=$4
+    local override_name=$5
 
     if [[ $client == python ]]; then
-        python_client_to_server_call $location $client $authentication $signer
+        python_client_to_server_call $location $client $authentication $signer $override_name
     else
-        evans_client_to_server_call $location $client $authentication $signer
+        evans_client_to_server_call $location $client $authentication $signer $override_name
     fi
 }
 
@@ -323,82 +353,106 @@ function correct_key_test_case ()
     local client=$2
     local authentication=$3
     local signer=$4
+    local override_name=$5
 
-    create_keys_and_certs $location $authentication $signer none
+    create_keys_and_certs $location $authentication $signer none $override_name
 
     description="correct_key_test_case: location=$location client=$client"
     description="$description authentication=$authentication signer=$signer"
+    description="$description override_name=$override_name"
 
-    if client_to_server_call $location $client $authentication $signer; then
+    if client_to_server_call $location $client $authentication $signer $override_name; then
         echo "${GREEN}Pass${NORMAL}: $description"
     else
         echo "${RED}Fail${NORMAL}: $description"
         ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     fi
+}
+
+function correct_key_test_cases_group ()
+{
+    local location=$1
+    local client=$2
+    local override_name=$3
+
+    correct_key_test_case $location $client none none $override_name
+    correct_key_test_case $location $client server self $override_name
+    correct_key_test_case $location $client server root $override_name
+    correct_key_test_case $location $client server intermediate $override_name
+    correct_key_test_case $location $client mutual self $override_name
+    correct_key_test_case $location $client mutual root $override_name
+    correct_key_test_case $location $client mutual intermediate $override_name
 }
 
 function correct_key_test_cases ()
 {
     local location=$1
-    local client=$2
 
-    correct_key_test_case $location $client none none
-    correct_key_test_case $location $client server self
-    correct_key_test_case $location $client server root
-    correct_key_test_case $location $client server intermediate
-    correct_key_test_case $location $client mutual self
-    correct_key_test_case $location $client mutual root
-    correct_key_test_case $location $client mutual intermediate
+    correct_key_test_cases_group $location python $DONT_OVERRIDE_NAME
+    correct_key_test_cases_group $location python $DO_OVERRIDE_NAME
+    if [[ $SKIP_EVANS == $FALSE ]]; then
+        correct_key_test_cases_group $location evans $DONT_OVERRIDE_NAME
+        correct_key_test_cases_group $location evans $DO_OVERRIDE_NAME
+    fi
 }
 
 function wrong_key_test_case ()
 {
     local location=$1
-    local authentication=$2
-    local signer=$3
-    local wrong_key=$4
+    local client=$2
+    local authentication=$3
+    local signer=$4
+    local wrong_key=$5
 
-    create_keys_and_certs $location $authentication $signer $wrong_key
+    create_keys_and_certs $location $authentication $signer $wrong_key $DONT_OVERRIDE_NAME
 
-    description="wrong_key_test_case: location=$location authentication=$authentication"
-    description="$description signer=$signer wrong_key=$wrong_key"
+    description="wrong_key_test_case: location=$location client=$client"
+    description="$description authentication=$authentication signer=$signer wrong_key=$wrong_key"
 
     # Since the key is wrong, we expect the call to fail and the test case passes if the call fails
-    if client_to_server_call $location python $authentication $signer; then
+    if client_to_server_call $location $client $authentication $signer $DONT_OVERRIDE_NAME; then
         echo "${RED}Fail${NORMAL}: $description"
         ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     else
         echo "${GREEN}Pass${NORMAL}: $description"
     fi
+}
+
+function wrong_key_test_cases_group ()
+{
+    local location=$1
+    local client=$2
+
+    wrong_key_test_case $location $client server self server
+    wrong_key_test_case $location $client server root server
+    wrong_key_test_case $location $client server root root
+    wrong_key_test_case $location $client server intermediate server
+    wrong_key_test_case $location $client server intermediate root
+    wrong_key_test_case $location $client server intermediate intermediate
+    wrong_key_test_case $location $client mutual self server
+    wrong_key_test_case $location $client mutual self client
+    wrong_key_test_case $location $client mutual root server
+    wrong_key_test_case $location $client mutual root client
+    wrong_key_test_case $location $client mutual root root
+    wrong_key_test_case $location $client mutual intermediate server
+    wrong_key_test_case $location $client mutual intermediate client
+    wrong_key_test_case $location $client mutual intermediate root
+    wrong_key_test_case $location $client mutual intermediate intermediate
 }
 
 function wrong_key_test_cases ()
 {
     local location=$1
 
-    wrong_key_test_case $location server self server
-    wrong_key_test_case $location server root server
-    wrong_key_test_case $location server root root
-    wrong_key_test_case $location server intermediate server
-    wrong_key_test_case $location server intermediate root
-    wrong_key_test_case $location server intermediate intermediate
-    wrong_key_test_case $location mutual self server
-    wrong_key_test_case $location mutual self client
-    wrong_key_test_case $location mutual root server
-    wrong_key_test_case $location mutual root client
-    wrong_key_test_case $location mutual root root
-    wrong_key_test_case $location mutual intermediate server
-    wrong_key_test_case $location mutual intermediate client
-    wrong_key_test_case $location mutual intermediate root
-    wrong_key_test_case $location mutual intermediate intermediate
+    wrong_key_test_cases_group $location python
+    if [[ $SKIP_EVANS == $FALSE ]]; then
+        wrong_key_test_cases_group $location evans
+    fi
 }
 
 function local_test_cases ()
 {
-    correct_key_test_cases local python
-    if [[ $SKIP_EVANS == $FALSE ]]; then
-        correct_key_test_cases local evans
-    fi
+    correct_key_test_cases local
     if [[ $SKIP_NEGATIVE == $FALSE ]]; then
         wrong_key_test_cases local
     fi
@@ -406,13 +460,9 @@ function local_test_cases ()
 
 function docker_test_cases ()
 {
-    correct_key_test_cases docker python
-    if [[ $SKIP_EVANS == $FALSE ]]; then
-        correct_key_test_cases docker evans
-    fi
+    correct_key_test_cases docker
     if [[ $SKIP_NEGATIVE == $FALSE ]]; then
-        wrong_key_test_cases docker local
-        wrong_key_test_cases docker evans
+        wrong_key_test_cases docker
     fi
 }
 

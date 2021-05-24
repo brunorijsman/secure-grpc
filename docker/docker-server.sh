@@ -16,15 +16,15 @@ docker network rm secure-grpc-net >/dev/null 2>&1
 docker network create --subnet=172.30.0.0/16 secure-grpc-net >/dev/null
 
 # Remove the server docker container from the previous run if it is still around
-docker rm secure-grpc-server >/dev/null 2>&1
+docker rm adder-server-host >/dev/null 2>&1
 
 # Start the server docker container
 docker run \
-    --name secure-grpc-server \
+    --name adder-server-host \
     --network secure-grpc-net \
     --ip 172.30.0.2 \
-    --hostname secure-grpc-server \
+    --hostname adder-server-host \
     --volume ${SECURE_GRPC_PATH}:/host \
     secure-grpc \
-    bash -c "cd /host && python3 server.py --client-name secure-grpc-client \
-             --server-name secure-grpc-server ${more_options}"
+    bash -c "cd /host && python3 server.py --client-host adder-client-host \
+             --server-host adder-server-host ${more_options}"

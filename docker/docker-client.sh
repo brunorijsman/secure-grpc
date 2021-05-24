@@ -10,15 +10,15 @@ SECURE_GRPC_PATH="${VIRTUAL_ENV}/.."
 more_options="$@"
 
 # Remove the client docker container from the previous run if it is still around
-docker rm secure-grpc-client >/dev/null 2>&1
+docker rm adder-client-host >/dev/null 2>&1
 
 # Start the client docker container
 docker run \
-    --name secure-grpc-client \
+    --name adder-client-host \
     --network secure-grpc-net \
     --ip 172.30.0.3 \
-    --hostname secure-grpc-client \
+    --hostname adder-client-host \
     --volume ${SECURE_GRPC_PATH}:/host \
     secure-grpc \
-    bash -c "cd /host && python3 client.py --client-name secure-grpc-client \
-             --server-name secure-grpc-server ${more_options}"
+    bash -c "cd /host && python3 client.py --client-host adder-client-host \
+             --server-host adder-server-host ${more_options}"
