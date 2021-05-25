@@ -14,12 +14,6 @@ SKIP_DOCKER=$FALSE
 SKIP_NEGATIVE=$FALSE
 TEST_CASES_FAILED=0
 
-USE_CORRECT_KEY=none
-DO_OVERRIDE_SERVER_NAME=$TRUE
-DONT_OVERRIDE_SERVER_NAME=$FALSE
-DO_OVERRIDE_CLIENT_NAME=$TRUE
-DONT_OVERRIDE_CLIENT_NAME=$FALSE
-
 function help ()
 {
     echo
@@ -165,8 +159,8 @@ function create_keys_and_certs ()
     local authentication=$2
     local signer=$3
     local wrong_key=$4
-    local override_server_name=$5
-    local override_client_name=$6
+    local server_naming=$5
+    local client_naming=$6
 
     local command="./create-keys-and-certs.sh"
     command="$command --authentication $authentication"
@@ -174,23 +168,23 @@ function create_keys_and_certs ()
         command="$command --signer $signer"
     fi
     if [[ $location == local ]]; then
-        if [[ $override_server_name == $TRUE ]]; then
+        if [[ $server_naming == "service" ]]; then
             command="$command --server-name adder-server-service"
         else
             command="$command --server-name localhost"
         fi
-        if [[ $override_client_name == $TRUE ]]; then
+        if [[ $client_naming == "service" ]]; then
             command="$command --client-name adder-client-service"
         else
             command="$command --client-name localhost"
         fi
     else
-        if [[ $override_server_name == $TRUE ]]; then
+        if [[ $server_naming == "service" ]]; then
             command="$command --server-name adder-server-service"
         else
             command="$command --server-name adder-server-host"
         fi
-        if [[ $override_client_name == $TRUE ]]; then
+        if [[ $client_naming == "service" ]]; then
             command="$command --client-name adder-client-service"
         else
             command="$command --client-name adder-client-host"
@@ -258,8 +252,8 @@ function python_client_to_server_call ()
     local client=$2
     local authentication=$3
     local signer=$4
-    local override_server_name=$5
-    local override_client_name=$6   # Use it; always validate client if mutual
+    local server_naming=$5
+    local client_naming=$6   # Use it; always validate client if mutual
 
     start_server $location $authentication $signer server_pid
     
@@ -282,7 +276,7 @@ function python_client_to_server_call ()
     else
         command="$command --server-host adder-server-host"
     fi
-    if [[ $override_server_name == $TRUE ]]; then
+    if [[ $server_naming == service ]]; then
         command="$command --server-name adder-server-service"
     fi
 
@@ -304,8 +298,8 @@ function evans_client_to_server_call ()
     local client=$2
     local authentication=$3
     local signer=$4
-    local override_server_name=$5
-    local override_client_name=$6   # Use it; always validate client if mutual
+    local server_naming=$5
+    local client_naming=$6   # Use it; always validate client if mutual
 
     start_server $location $authentication $signer server_pid
 
@@ -325,7 +319,7 @@ function evans_client_to_server_call ()
         if [[ $authentication == "mutual" ]]; then
             command="$command --cert certs/client.pem --certkey keys/client.key"
         fi
-        if [[ $override_server_name == $TRUE ]]; then
+        if [[ $server_naming == service ]]; then
             command="$command --servername adder-server-service"
         fi
     fi
@@ -352,15 +346,15 @@ function client_to_server_call ()
     local client=$2
     local authentication=$3
     local signer=$4
-    local override_server_name=$5
-    local override_client_name=$6
+    local server_naming=$5
+    local client_naming=$6
 
     if [[ $client == python ]]; then
-        python_client_to_server_call $location $client $authentication $signer \
-            $override_server_name $override_client_name
+        python_client_to_server_call $location $client $authentication $signer $server_naming \
+            $client_naming
     else
-        evans_client_to_server_call $location $client $authentication $signer \
-            $override_server_name $override_client_name
+        evans_client_to_server_call $location $client $authentication $signer $server_naming \
+            $client_naming
     fi
 }
 
@@ -370,19 +364,18 @@ function correct_key_test_case ()
     local client=$2
     local authentication=$3
     local signer=$4
-    local override_server_name=$5
-    local override_client_name=$5
+    local server_naming=$5
+    local client_naming=$5
 
-    create_keys_and_certs $location $authentication $signer $USE_CORRECT_KEY $override_server_name \
-        $override_client_name
+    create_keys_and_certs $location $authentication $signer none $server_naming $client_naming
 
     description="correct_key_test_case: location=$location client=$client"
     description="$description authentication=$authentication signer=$signer"
-    description="$description override_server_name=$override_server_name"
-    description="$description override_client_name=$override_client_name"
+    description="$description server_naming=$server_naming"
+    description="$description client_naming=$client_naming"
 
-    if client_to_server_call $location $client $authentication $signer $override_server_name \
-        $override_client_name; then
+    if client_to_server_call $location $client $authentication $signer $server_naming \
+        $client_naming; then
         echo "${GREEN}Pass${NORMAL}: $description"
     else
         echo "${RED}Fail${NORMAL}: $description"
@@ -394,31 +387,27 @@ function correct_key_test_cases_group ()
 {
     local location=$1
     local client=$2
-    local override_server_name=$3
-    local override_client_name=$3
+    local server_naming=$3
+    local client_naming=$3
 
-    correct_key_test_case $location $client none none $override_server_name $override_client_name
-    correct_key_test_case $location $client server self $override_server_name $override_client_name
-    correct_key_test_case $location $client server root $override_server_name $override_client_name
-    correct_key_test_case $location $client server intermediate $override_server_name \
-        $override_client_name
-    correct_key_test_case $location $client mutual self $override_server_name $override_client_name
-    correct_key_test_case $location $client mutual root $override_server_name $override_client_name
-    correct_key_test_case $location $client mutual intermediate $override_server_name \
-        $override_client_name
+    correct_key_test_case $location $client none none $server_naming $client_naming
+    correct_key_test_case $location $client server self $server_naming $client_naming
+    correct_key_test_case $location $client server root $server_naming $client_naming
+    correct_key_test_case $location $client server intermediate $server_naming $client_naming
+    correct_key_test_case $location $client mutual self $server_naming $client_naming
+    correct_key_test_case $location $client mutual root $server_naming $client_naming
+    correct_key_test_case $location $client mutual intermediate $server_naming $client_naming
 }
 
 function correct_key_test_cases ()
 {
     local location=$1
 
-    for override_server_name in $DONT_OVERRIDE_SERVER_NAME $DO_OVERRIDE_SERVER_NAME; do
-        for override_client_name in $DONT_OVERRIDE_CLIENT_NAME $DO_OVERRIDE_CLIENT_NAME; do
-            correct_key_test_cases_group $location python $override_server_name \
-                $override_client_name
+    for server_naming in host service; do
+        for client_naming in host service; do
+            correct_key_test_cases_group $location python $server_naming $client_naming
             if [[ $SKIP_EVANS == $FALSE ]]; then
-                correct_key_test_cases_group $location evans $override_server_name \
-                    $override_client_name
+                correct_key_test_cases_group $location evans $server_naming $client_naming
             fi
         done
     done
@@ -432,15 +421,13 @@ function wrong_key_test_case ()
     local signer=$4
     local wrong_key=$5
 
-    create_keys_and_certs $location $authentication $signer $wrong_key $DONT_OVERRIDE_SERVER_NAME \
-        $DONT_OVERRIDE_CLIENT_NAME
+    create_keys_and_certs $location $authentication $signer $wrong_key host host
 
     description="wrong_key_test_case: location=$location client=$client"
     description="$description authentication=$authentication signer=$signer wrong_key=$wrong_key"
 
     # Since the key is wrong, we expect the call to fail and the test case passes if the call fails
-    if client_to_server_call $location $client $authentication $signer \
-       $DONT_OVERRIDE_SERVER_NAME $DONT_OVERRIDE_CLIENT_NAME; then
+    if client_to_server_call $location $client $authentication $signer host host; then
         echo "${RED}Fail${NORMAL}: $description"
         ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     else
@@ -487,16 +474,14 @@ function wrong_client_test_case ()
     local authentication=$3
     local signer=$4
 
-    create_keys_and_certs $location $authentication $signer $USE_CORRECT_KEY \
-        $DONT_OVERRIDE_SERVER_NAME $DO_OVERRIDE_CLIENT_NAME
+    create_keys_and_certs $location $authentication $signer none host service
 
     description="wrong_client_test_case: location=$location client=$client"
     description="$description authentication=$authentication signer=$signer"
 
     # Authenticate the client using the wrong client name. This should fail.
     ### TODO: Implement this
-    # if client_to_server_call $location $client $authentication $signer $DONT_OVERRIDE_SERVER_NAME \
-    #     $DO_OVERRIDE_CLIENT_NAME; then
+    # if client_to_server_call $location $client $authentication $signer host service; then
     #     echo "${RED}Fail${NORMAL}: $description"
     #     ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     # else
