@@ -8,7 +8,22 @@ import common
 
 class Adder(adder_pb2_grpc.AdderServicer):
 
+    def __init__(self, args):
+        adder_pb2_grpc.AdderServicer.__init__(self)
+        self._args = args
+
+    async def _validate_client(self, context):
+        if self._args.client_name is None:
+            return
+        encoded_allowed_client_name = self._args.client_name.encode()
+        if encoded_allowed_client_name == context.auth_context()["x509_common_name"]:
+            return
+        if encoded_allowed_client_name in context.peer_identities():
+            return
+        await context.abort(grpc.StatusCode.PERMISSION_DENIED, "Unauthorized client")
+
     async def Add(self, request, context):
+        await self._validate_client(context)
         reply = adder_pb2.AddReply(sum=request.a + request.b)
         print(f"Server: {request.a} + {request.b} = {reply.sum}")
         return reply
@@ -40,7 +55,7 @@ async def main():
     else:
         credentials = make_credentials(args)
         server.add_secure_port(server_address, credentials)
-    adder_pb2_grpc.add_AdderServicer_to_server(Adder(), server)
+    adder_pb2_grpc.add_AdderServicer_to_server(Adder(args), server)
     await server.start()
     print(f"Server: listening on {server_address}")
     await server.wait_for_termination()

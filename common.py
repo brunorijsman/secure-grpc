@@ -1,5 +1,6 @@
 import argparse
 
+# TODO: Make --client-name work (error message on client if server rejects it)
 # TODO: Can server determine client-name in certificate from context?
 # TODO: If yes, add command-line option to let server validate client-name.
 
@@ -11,6 +12,11 @@ def parse_command_line_arguments(role):
         choices=["none", "server", "mutual"],
         default="none",
         help="Authentication: none, server, or mutual (default: none)")
+    if role == "server":
+        parser.add_argument(
+            "--client-name", "-C",
+            type=str,
+            help="Only allow specified client name to connect (default: allow any client)")
     parser.add_argument(
         "--server-host", "-s",
         type=str,
@@ -19,7 +25,7 @@ def parse_command_line_arguments(role):
     parser.add_argument(
         "--server-name", "-S",
         type=str,
-        help="Server name override, if different from the server host name.")
+        help="Server name override, if different from the server host name")
     parser.add_argument(
         "--server-port", "-p",
         type=int,

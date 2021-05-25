@@ -2,6 +2,7 @@
 
 import asyncio
 import random
+import sys
 import grpc
 import adder_pb2
 import adder_pb2_grpc
@@ -41,7 +42,11 @@ async def main():
     a = random.randint(1, 10001)
     b = random.randint(1, 10001)
     request = adder_pb2.AddRequest(a=a, b=b)
-    reply = await stub.Add(request)
+    try:
+        reply = await stub.Add(request)
+    except grpc.RpcError as rpc_error:
+        print(f"Client: server returned error {rpc_error}")
+        sys.exit(1)
     assert reply.sum == a + b
     print(f"Client: {request.a} + {request.b} = {reply.sum}")
     await channel.close()
