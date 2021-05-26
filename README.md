@@ -112,51 +112,129 @@ We refer to this as the optional **client name check**.
 
 [Google RPC supports the following authentication protocols](https://grpc.io/docs/guides/auth/):
 
-* **TLS**: Transport Layer Security. It provides both authentication and encryption. By default
-  only the client authenticates the server (and not vice versa).
+* [Transport Layer Security (**TLS**)](https://datatracker.ietf.org/doc/html/rfc8446),
+  also known by its former and deprecated name Secure Sockets Layer (SSL). 
+  This is a widely used standard protocol for providing authentication and encryption
+  at the transport (TCP) layer. It is the underlying protocol for secure application layer
+  protocols such as HTTPS. In many use cases (e.g. secure web browsing) TLS is only used for the
+  client to authenticate the server and for encryption. In such cases, some other mechanism (e.g.
+  a username and a password or a two-factor authentication hardware token) is used for the server
+  to authenticate the client.
 
-* **mTLS**: Mutual Transport Layer Security. The same as TLS, except that the client and server
-  mutually authenticate each other. It is not really a different protocol; just a specific way of
-  using TLS.
+* Mutual TLS (**mTLS**). When TLS is used for application-to-application communications (as opposed
+  to human-to-application communications) it is common to use TLS for both parties to authenticate
+  each other. Not only does the client authenticate the server, but the server also authenticates
+  the client.
 
-* **ALTS**: Application Layer Transport Protocol. This is a new protocol defined by Google that
-  is more optimized for authentication and encryption in the context of application-to-application
-  API calls (as opposed to TLS which has its historical roots in web browser to web server
-  security).
+* [Application Layer Transport Security (**ALTS**)](https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security) 
+  is a mutual authentication and transport encryption system developed by Google and typically used
+  for securing Remote Procedure Call (RPC) communications within Google's infrastructure. ALTS 
+  is similar in concept to MTLS but has been designed and optimized to meet the needs of Google's
+  datacenter environments.
 
 * GRPC also supports **token-based authentication** which is intended to be used in Google APIs
   (e.g. APIs in Google Cloud Platform).
 
 We currently only support TLS and mTLS version 1.3. We do not yet support ALTS or tokens.
 
+# Using the Example Code
+
+## Installation Instructions
+
+The steps to install the code are as follows (we have tested these steps on macOS Catalina 10.15.7
+and on Linux Ubuntu @@@) but they should work on other UNIX-ish platforms as well.
+
+Make sure that you have `git` installed:
+
+<pre>
+$ <b>git --version</b>
+git version 2.29.2
+</pre>
+
+Make sure that you have `Python` version 3.8 or later installed:
+
+<pre>
+$ <b>python --version</b>
+Python 3.8.7
+</pre>
+
+Make sure that you have `pip` installed:
+
+<pre>
+$ <b>pip --version</b>
+pip 20.2.3 from /Users/brunorijsman/.pyenv/versions/3.8.7/lib/python3.8/site-packages/pip (python 3.8)
+</pre>
+
+The test script uses Docker to test running the server and client in different hosts
+(you can disable this using the `)
+
+Clone this GitHub repository:
+
+<pre>
+$ <b>git clone https://github.com/brunorijsman/secure-grpc.git</b>
+Cloning into 'secure-grpc'...
+remote: Enumerating objects: 427, done.
+remote: Counting objects: 100% (427/427), done.
+remote: Compressing objects: 100% (282/282), done.
+remote: Total 427 (delta 254), reused 290 (delta 119), pack-reused 0
+Receiving objects: 100% (427/427), 88.95 KiB | 1023.00 KiB/s, done.
+Resolving deltas: 100% (254/254), done.
+</pre>
+
+Change directory to the cloned repo:
+
+<pre>
+$ <b>cd secure-grpc</b>
+</pre>
+
+Create and activate a Python virtual environment:
+
+<pre>
+$ <b>python -m venv venv</b>
+$ <b>source venv/bin/activate</b>
+(venv) $
+</pre>
+
+Install the Python dependencies:
+
+<pre>
+(venv) $ <b>pip install -r requirements.txt</b>
+Collecting astroid==2.5.6
+  Using cached astroid-2.5.6-py3-none-any.whl (219 kB)
+[...]
+    Running setup.py install for grpc-status ... done
+Successfully installed astroid-2.5.6 asyncio-3.4.3 googleapis-common-protos-1.53.0 grpc-status-0.0.1 grpcio-1.38.0 grpcio-status-1.38.0 grpcio-tools-1.37.1 isort-5.8.0 lazy-object-proxy-1.6.0 mccabe-0.6.1 mypy-0.812 mypy-extensions-0.4.3 protobuf-3.16.0 pylint-2.8.2 six-1.16.0 toml-0.10.2 typed-ast-1.4.3 typing-extensions-3.10.0.0 wrapt-1.12.1
+</pre>
+
+If you get a warning about a new version if `pip` being available you may ignore it or you can 
+upgrade `pip`:
+
+<pre>
+(venv) $ <b>pip install --upgrade pip</b>
+Collecting pip
+  Using cached pip-21.1.2-py3-none-any.whl (1.5 MB)
+Installing collected packages: pip
+  Attempting uninstall: pip
+    Found existing installation: pip 20.2.3
+    Uninstalling pip-20.2.3:
+      Successfully uninstalled pip-20.2.3
+Successfully installed pip-21.1.2
+</pre>
+
+You have completed the installation. The make sure it was successful you can invoke the server
+help:
+
+<pre>
+(venv) $ <b>./server.py --help</b>
+usage: server.py [-h] [--authentication {none,server,mutual}] [--client-name CLIENT_NAME] [--server-host SERVER_HOST] [--server-port SERVER_PORT] [--signer {self,ca}]
+
+Secure gRPC demo server
+[...]
+</pre>
+
 # ** CONTINUE FROM HERE **
 
-## TLS versus mTLS versus ALTS
-
-In this tutorial we look at three different [authentication protocols](https://grpc.io/docs/guides/auth/):
-
-1. [Transport Layer Security (TLS)](https://datatracker.ietf.org/doc/html/rfc8446),
-   also known by its former and deprecated name Secure Sockets Layer (SSL). 
-   This is a widely used standard protocol for providing authentication and encryption
-   at the transport (TCP) layer. It is the underlying protocol for secure application layer
-   protocols such as HTTPS. In many use cases (e.g. secure web browsing) TLS is only used for the
-   client to authenticate the server and for encryption. In such cases, some other mechanism (e.g.
-   a username and a password or a two-factor authentication hardware token) is used for the server
-   to authenticate the client.
-
-2. Mutual TLS (MTLS). When TLS is used for application-to-application communications (as opposed
-   to human-to-application communications) it is common to use TLS for both parties to authenticate
-   each other. Not only does the client authenticate the server, but the server also authenticates
-   the client.
-
-3. [Application Layer Transport Security (ALTS)](https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security) 
-   is a mutual authentication and transport encryption system developed by Google and typically used
-   for securing Remote Procedure Call (RPC) communications within Google's infrastructure. ALTS 
-   is similar in concept to MTLS but has been designed and optimized to meet the needs of Google's
-   datacenter environments.
-
-GRPC also supports a token-based authentication protocol which we will not discuss in this tutorial.
-It is intended for interacting with Google APIs provided by the Google Cloud Platform (GCP).
+# Implementation Details
 
 ## Grpcio versus grpclib
 
