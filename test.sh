@@ -200,7 +200,8 @@ function start_server ()
     local location=$1
     local authentication=$2
     local signer=$3
-    local server_pid_return_var=$4
+    local check_client_naming=$4 ### use it: host, service, dont_check
+    local server_pid_return_var=$5
 
     local options="--authentication $authentication"
     if [[ $authentication != "none" ]]; then
@@ -225,6 +226,7 @@ function start_server ()
         while [[ $server_container_id == "" ]]; do
             server_container_id=$(docker ps --filter name=adder-server-host --quiet)
         done
+        sleep 0.2
     fi
     sleep 0.2
 
@@ -253,9 +255,9 @@ function python_client_to_server_call ()
     local authentication=$3
     local signer=$4
     local server_naming=$5
-    local client_naming=$6   # Use it; always validate client if mutual
+    local check_client_naming=$6   # Use it; always validate client if mutual
 
-    start_server $location $authentication $signer server_pid
+    start_server $location $authentication $signer $check_client_naming server_pid
     
     local command
     if [[ $location == local ]]; then
@@ -299,9 +301,9 @@ function evans_client_to_server_call ()
     local authentication=$3
     local signer=$4
     local server_naming=$5
-    local client_naming=$6   # Use it; always validate client if mutual
+    local check_client_naming=$6   # Use it; always validate client if mutual
 
-    start_server $location $authentication $signer server_pid
+    start_server $location $authentication $signer $check_client_naming server_pid
 
     local command
     if [[ $location == local ]]; then
@@ -347,14 +349,42 @@ function client_to_server_call ()
     local authentication=$3
     local signer=$4
     local server_naming=$5
-    local client_naming=$6
+    local check_client_naming=$6
 
     if [[ $client == python ]]; then
         python_client_to_server_call $location $client $authentication $signer $server_naming \
-            $client_naming
+            $check_client_naming
     else
         evans_client_to_server_call $location $client $authentication $signer $server_naming \
-            $client_naming
+            $check_client_naming
+    fi
+}
+
+function correct_key_test_case_check_client ()
+{
+    local location=$1
+    local client=$2
+    local authentication=$3
+    local signer=$4
+    local server_naming=$5
+    local client_naming=$6
+    local check_client_naming=$7
+
+    create_keys_and_certs $location $authentication $signer none $server_naming $client_naming
+
+    description="correct_key_test_case: location=$location client=$client"
+    description="$description authentication=$authentication signer=$signer"
+    description="$description server_naming=$server_naming"
+    description="$description client_naming=$client_naming"
+    description="$description check_client_naming=dont_check"
+
+    ###
+    if client_to_server_call $location $client $authentication $signer $server_naming \
+        dont_check; then
+        echo "${GREEN}Pass${NORMAL}: $description"
+    else
+        echo "${RED}Fail${NORMAL}: $description"
+        ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     fi
 }
 
@@ -367,21 +397,13 @@ function correct_key_test_case ()
     local server_naming=$5
     local client_naming=$5
 
-    create_keys_and_certs $location $authentication $signer none $server_naming $client_naming
+    correct_key_test_case_check_client $location $client $authentication $signer \
+        $server_naming $client_naming dont_check
 
-    description="correct_key_test_case: location=$location client=$client"
-    description="$description authentication=$authentication signer=$signer"
-    description="$description server_naming=$server_naming"
-    description="$description client_naming=$client_naming"
-
-    if client_to_server_call $location $client $authentication $signer $server_naming \
-        $client_naming; then
-        echo "${GREEN}Pass${NORMAL}: $description"
-    else
-        echo "${RED}Fail${NORMAL}: $description"
-        ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
-    fi
+    correct_key_test_case_check_client $location $client $authentication $signer \
+        $server_naming $client_naming dont_check
 }
+
 
 function correct_key_test_cases_group ()
 {

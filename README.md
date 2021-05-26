@@ -1,21 +1,135 @@
-# **THIS IS TUTORIAL IS STILL A WORK IN PROGRESS AND NOT YET COMPLETE**
-
 # Securing Google Remote Procedure Calls (gRPC)
 
-## Introduction
+This repository contains the following example code for securing Google Remote Procedure Calls
+(gRPC):
 
-This is a step-by-step tutorial on how to secure Google Remote Procedure Calls (gRPC) using
-asynchronous Python (asyncio).
+* A simple gRPC server that can authenticate itself and (optionally) the client.
 
-1. Start with an unsecured service (no authentication and no encryption).
+* A simple gRPC client that can authenticate the server.
 
-2. Add client authentication of the server and encryption:
-   
-   a. Using self-signed certificates.
-   
-   b. TODO Using a Certificate Authority (CA) signed certificate.
+* Both the server and the client are implemented in Python using asynchronous input/out (aio).
 
-3. TODO Add server authentication of the client, i.e. mutual authentication.
+* A test scripts that automatically tests all possible authentication schemes. It tests not only
+  that authentication accepts the connection when the keys and certificates are correct, but also
+  that authentication rejects the connection when the keys or the certificates are incorrect.
+
+* A script for generating the correct keys and certificates for a given authentication scheme.
+
+# Authentication Schemes
+
+Our code supports multiple authentication schemes. The scheme is determined by the combination of
+the parameters listed below. The test scrips tests all possible parameter combinations.
+
+## Authenticated Parties
+
+The authenticated parties can be:
+
+* **None**: There is no authentication. The client does not authenticate the server, and the server
+  does not authenticate the client. But the connection is still encrypted using TLS.
+
+* **Server**: The client authenticates the server (i.e. the server is the authenticated party) but
+  the server does not authenticate the client. This is the most common usage of TLS for human
+  web-browsing.
+
+* **Mutual**: The client authenticate the server and the server also authenticates the server (but
+  also see "client name check" below). This is referred to as mutual TLS (mTLS) and it is typically
+  used for machine-to-machine APIs.
+
+## Certificate Signer
+
+The client uses the server certificate to authenticate the server, and the server uses the client
+certificate to authenticate the client.
+In both cases, checking the signature on the certificate is a crucial step in checking the validity
+of the certificate.
+
+The certificate signer can be:
+
+* **Self-signed**: The certificate can be self-signed. In this case the private key corresponding to
+  the public in the certificate is used to sign the certificate. The operator must install the
+  certificate of each trusted server on the client. And vice versa, for mutual authentication, the
+  operator must install the certificate of each trusted client on the server.
+
+* **Certificate Authority (CA) signed** The certificate is signed by a Certificate Authority (CA).
+  This big advantage of this approach is that the operator only needs to install the root CA
+  certificate on each server and client.
+  There are several variations on this:
+
+  * The certificate of the leaf (i.e. the certificate of the server or the client) is directly
+    signed by the **root** CA. In other words, the certificate chain length is 2.
+
+  * The certificate of the leaf is signed by an **intermediate** CA and the certificate of the
+    intermediate CA is signed by the root CA. In other words, the certificate chain length is 3.
+
+  * There can be multiple levels of intermediate CAs. In other words, the certificate chain length
+    is 4 or more.
+
+Our server and client code support all of the above variations. However, our script for generating
+certificates and our script for automated testing only support certificate chain lengths up to and
+including 3.
+
+Our code generates a self-signed root CA certificate. In other words, we don't rely on the list
+of trusted public root CAs that is pre-installed on the computer (e.g. in the key chain in macOS).
+This allows our code to sign leaf and intermediate CA certificates (it would be impractical and
+expensive to have a public CA sign our certificates, although it has gotten easier since
+[Encryption Everywhere](https://www.websecurity.digicert.com/theme/encryption-everywhere)
+was introduced).
+Using self-signed "private" root CAs is common for accessing resources (such as APIs) within the
+context of an enterprise. 
+
+## Server Name Indication (SNI)
+
+When the client authenticates the server, it can perform the **server naming check** in one of two
+ways:
+
+* The client verifies that the server name in the certificate matches the DNS host name of the
+  server. This default behavior of TLS. We refer to this as **server host naming** in our code.
+
+* The client uses the TLS Server Name Indication (SNI) option to explicitly choose the server name
+  to be authenticated. Historically, this was typically used when multiple different web sites where
+  hosted on a single web servers. The web server used the SNI option to present the correct
+  certificate to the client. In the context of APIs, it allows us to decouple the naming of services
+  from hosts. Hence, we refer to this as **server service naming** in our code.
+
+Note: our code stores and checks the authenticated name of a leaf in both the Common Name (CN) field
+of the certificate (for compatibility with older code) and in the Subject Alternative Name (SAN)
+field of the certificate (for compatibility with newer code that insists on it).
+
+## Client Name Check
+
+When a server authenticates a client, i.e. when using mutual TLS (mTLS), by default the server only
+validates whether the certificate presented by the client is properly signed by a trusted
+certificate authority.
+If the certificate is self-signed, this means that the client certificate must be pre-installed on
+the server.
+Either way, by default, the server does _not_ check the name of the client in the certificate. 
+
+This behavior can be overridden in our code. 
+The server code can check whether the name of the client (which is present in the validated
+certificate presented by the client) matches a pre-configured list of trusted client names.
+We refer to this as the optional **client name check**.
+
+## Authentication Protocol
+
+[Google RPC supports the following authentication protocols](https://grpc.io/docs/guides/auth/):
+
+* **TLS**: Transport Layer Security. It provides both authentication and encryption. By default
+  only the client authenticates the server (and not vice versa).
+
+* **mTLS**: Mutual Transport Layer Security. The same as TLS, except that the client and server
+  mutually authenticate each other. It is not really a different protocol; just a specific way of
+  using TLS.
+
+* **ALTS**: Application Layer Transport Protocol. This is a new protocol defined by Google that
+  is more optimized for authentication and encryption in the context of application-to-application
+  API calls (as opposed to TLS which has its historical roots in web browser to web server
+  security).
+
+* GRPC also supports **token-based authentication** which is intended to be used in Google APIs
+  (e.g. APIs in Google Cloud Platform).
+
+We currently only support TLS and mTLS version 1.3. We do not yet support ALTS or tokens.
+
+# ** CONTINUE FROM HERE **
 
 ## TLS versus mTLS versus ALTS
 
