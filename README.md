@@ -1191,7 +1191,7 @@ only the client has access.
 The contents of the `client.key` file look like gibberish; not because it is encrypted but rather
 because it is encoded using the ASN.1 encoding rules and a base-64 representation:
 
-```
+<pre>
 $ <b>cat keys/client.key</b>
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpQIBAAKCAQEA0zptDHxc3MiD/Bpa24ike+xcaBQr1BjSDOEwPOkILtBJRudk
@@ -1200,7 +1200,7 @@ avac0uwfWbYn2DILccYirmt2uLtvyFEmNtk7JVb5rte8lsVO0qNAW+i4jsafk7rd
 AA6ye3CdLoc5EDdGK9y3CDTtt2w+3ulZp+jnJN89MmsJ0d06bWTfZTcHVFt2bVFi
 jKesxM94ejX2SFd44Sv7prv9qTO/94NmCfRi7HTtrFrTUZ0qK1rEuXM=
 -----END RSA PRIVATE KEY-----
-```
+</pre>
 
 You can convert the private key file into a human-readable form using the following command.
 
@@ -1289,8 +1289,8 @@ This generates a CSR file similar to the following.
 Note that the CSR file contains the information in both encoded and decoded form (this is because
 of the `-text` option):
 
+File `admin/client.csr`:
 <pre>
-$ <b>cat admin/client.csr</b>
 Certificate Request:
     Data:
         Version: 0 (0x0)
@@ -1324,171 +1324,130 @@ gEm3UADwdVm7exo=
 -----END CERTIFICATE REQUEST-----
 </pre>
 
-# CONTINUE FROM HERE
+### Generating certificates
 
-### Generating a self-signed leaf certificate
+Once we have the certificate signing request (CSR) the signing certificate authority can generate
+the corresponding certificate from it. The process is different for:
+* CA-signed leaf certificates
+* Self-signed leaf certificates
+* Root-CA certificates
+* Intermediate-CA certificates
 
-# Client authenticates server using TLS
+Certificates are not secret. They can be stored in a public place. In fact, any party that wants to
+be authenticated by another party (the authenticating party) must make its certificate available to
+the authenticating party.
 
-We will now update the code to use Transport Layer Security (TLS) to let the client authenticate
-the server and to encrypt all traffic between the client and the server.
-At this point, the server does not yet authenticate the client, i.e. we don't Mutual TLS
-(MTLS) yet.
+We describe each of these in turn (not in the order listed above).
 
-For now we will be using self-signed certificates. This means we have to manually
-install the certificate for each trusted server on the client. In later sections we will describe
-how to use Certificate Authorities (CAs) to avoid this manual installation step.
+### Generating a CA-signed leaf certificate 
 
-Use the following command to generate both the private key and the self-signed certificate that
-contains the corresponding public key:
+In this example, we will be generating a client certificate signed by an intermediate CA.
 
-```
-$ openssl req -newkey rsa:2048 -nodes -keyout server.key -x509 -subj "/C=US/ST=WA/L=Seattle/O=RemoteAutonomy/CN=localhost" -out server.crt
-Generating a 2048 bit RSA private key
-..+++
-...................................................................................................................................+++
-writing new private key to 'server.key'
------
-```
+In order to generate a CA-signed leaf certificate, we need two configuration files.
 
-The meaning of the `openssl` command line options is as follows:
-* `req`: Create a certificate request in PKCS#10 format.
-* `-newkey rsa:2048`: Create a new certificate request and a new private key, which is a 2048 bit
-   RSA key.
-* `-nodes`: Do not encrypt the private key file.
-* `-keyout server.key`: Create a private key file `server.key`.
-* `-x509`: Issue a self-signed certificate instead of a certificate request.
-* `-subj "/C=US/ST=WA/L=Seattle/O=RemoteAutonomy/CN=localhost"`: Sets the subject in the certificate.
-   `C` is the country, `ST` is the state, `L` is the locality, `O` is the organization, and `CN`
-   is the common name.
-* `-out server.crt`: Create a certificate file `server.crt`.
+The first configuration file, `admin/intermediate.config` contains most of the information that the
+signing CA needs to generate and sign the certificate:
 
-The `server.key` file contains text similar to the following (your key will be different):
+File `admin/intermediate.config`:
+<pre>
+[ca]
+default_ca      = CA_default
 
-```
- $ cat server.key
------BEGIN RSA PRIVATE KEY-----
-MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDRqQxWhgEDgZ1M
-2nsyOh3gqsLUa4m3SPhrk1zSo3g7p4JkRHSSKVTI2NQOomMyFc6SobvoRJ0QGIYF
-[...]
-YxsfPh3BSJUts81T0X/0NGuVR+wyO7BlL1yTlLB9ysoBTFiYMuE8xasx5LOixWjh
-ojBvoD5gGqC5UiAz9aKETA==
------END RSA PRIVATE KEY-----
-```
+[CA_default]
+database        = admin/intermediate/database
+new_certs_dir   = admin/intermediate
+certificate     = certs/intermediate.crt
+serial          = admin/intermediate/serial
+private_key     = keys/intermediate.key
+policy          = policy_any
+email_in_dn     = no
+unique_subject  = no
+copy_extensions = copy
+default_md      = sha256
 
-This gibberish is the @@@
+[policy_any]
+countryName            = optional
+stateOrProvinceName    = optional
+organizationName       = optional
+organizationalUnitName = optional
+commonName             = supplied
+</pre>
 
-You can look at the decoded contents of the private key file using the following command:
+The second configuration file, `admin/client_leaf.ext` in this example describes the constraints
+on how the generated certificate may be used:
 
-```
-$ openssl rsa -noout -text -in server.key
-Private-Key: (4096 bit)
-modulus:
-    00:c5:1b:cf:10:1f:87:bc:3f:2e:38:97:79:0c:3e:
-    e7:6d:41:e8:e5:e8:71:77:57:5b:a9:07:d7:03:3e:
-    [...]
-    08:49:a1:62:c2:87:81:8f:a2:2e:9b:1c:45:2a:72:
-    96:1d:69
-publicExponent: 65537 (0x10001)
-privateExponent:
-    6f:57:52:13:ed:7b:a3:1e:9d:61:62:4f:02:57:d6:
-    2a:a5:7c:85:c2:53:b5:f2:26:d8:c8:90:f0:48:0c:
-    [...]
-    45:cc:59:8a:98:ec:39:86:8f:e2:0c:eb:38:86:99:
-    cb:31
-prime1:
-    00:f9:f9:16:2e:c9:ab:23:7c:c9:e1:a5:b4:df:f7:
-    0c:6d:d7:b0:d2:40:4c:2c:f4:ab:de:08:d2:a6:cb:
-    [...]
-    f1:86:dc:a9:46:80:c2:ce:01:6d:64:41:ba:66:cb:
-    46:0f
-prime2:
-    00:c9:dc:6d:28:36:e8:9a:5a:a5:aa:ed:89:6c:a0:
-    c0:34:92:91:5c:78:e1:c7:9d:46:9b:05:61:08:e2:
-    [...]
-    61:8b:a2:12:27:de:1f:d1:c2:a0:10:0c:79:05:f0:
-    9d:07
-exponent1:
-    00:bb:b5:a5:47:bb:1e:ad:46:5e:de:f8:2d:2b:e5:
-    7b:4a:dc:a6:26:2c:2c:47:b1:ef:81:8b:04:8c:45:
-    [...]
-    ae:99:04:08:85:2d:d9:9b:12:8d:4f:b4:df:c1:a3:
-    31:57
-exponent2:
-    05:a5:55:a4:3f:4c:e8:2c:4a:df:e9:fe:e2:fb:e8:
-    04:50:69:22:65:fb:22:a3:22:7b:69:7e:1a:4a:85:
-    [...]
-    4f:82:7b:f1:83:83:ee:50:fc:3b:16:ae:37:dd:4f:
-    f7
-coefficient:
-    00:d0:b9:35:35:ee:a7:4e:58:50:bd:4e:55:10:58:
-    fd:4d:de:e4:e8:b3:70:7a:48:d2:8d:a5:10:91:d4:
-    [...]
-    30:0f:43:17:e8:6f:9f:8b:a1:36:86:73:7e:2b:21:
-    03:5f
-```
+File admin/client_leaf.ext:
+<pre>
+[default]
+basicConstraints = critical, CA:false
+keyUsage         = critical, digitalSignature, keyEncipherment
+</pre>
 
-As you can see, the private key file does not actually contain the private key itself. Instead, it
-contains a number of parameters (modulus, public exponent, private exponent, prime 1, prime 2,
-exponent 1, exponent 2, and coefficient) from which you can compute both the private key and the
-public key using the [RSA algorithm](https://en.wikipedia.org/wiki/RSA_(cryptosystem)).
+Then we use the following OpenSSL command to actually generate the certificate:
 
-Similarly, the certificate file contains ASN.1 encoded gibberish:
+<pre>
+$ <b>openssl ca \
+  -batch \
+  -in admin/client.csr \
+  -out certs/client.crt \
+  -config admin/intermediate.config \
+  -extfile admin/client_leaf.ext \
+  -days 365</b>
+</pre>
 
-```
-(venv) $ cat server.crt
------BEGIN CERTIFICATE-----
-MIIDKDCCAhACCQCrGNDUOW0JjjANBgkqhkiG9w0BAQsFADBWMQswCQYDVQQGEwJV
-UzELMAkGA1UECAwCV0ExEDAOBgNVBAcMB1NlYXR0bGUxFzAVBgNVBAoMDlJlbW90
-[...]
-LSk0YNPiS+kvhGgc3jCLblFASgbBK2/oasdfMJ/v29vmItXhPibciTmeSM7kPcC6
-WMXyk6u6L4Ee0tI7xgQfczcZkaKawGqFKcbY/H+PqbJG/0fCkGG/npbUcYI=
------END CERTIFICATE-----
-```
+This produces the client certificate in file `certs/client.crt`:
 
-Use the following command to see the decoded certificate:
-
-```
-(venv) $ openssl x509 -in server.crt -text -noout
+File `certs/client.crt`:
+<pre>
 Certificate:
     Data:
-        Version: 1 (0x0)
-        Serial Number: 12328833589841824142 (0xab18d0d4396d098e)
+        Version: 3 (0x2)
+        Serial Number: 1 (0x1)
     Signature Algorithm: sha256WithRSAEncryption
-        Issuer: C=US, ST=WA, L=Seattle, O=RemoteAutonomy, CN=server
+        Issuer: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=Example Corp Intermediate Certificate Authority
         Validity
-            Not Before: May 12 09:38:56 2021 GMT
-            Not After : Jun 11 09:38:56 2021 GMT
-        Subject: C=US, ST=WA, L=Seattle, O=RemoteAutonomy, CN=server
+            Not Before: May 27 14:20:20 2021 GMT
+            Not After : May 27 14:20:20 2022 GMT
+        Subject: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=adder-client-host
         Subject Public Key Info:
             Public Key Algorithm: rsaEncryption
                 Public-Key: (2048 bit)
                 Modulus:
-                    00:d1:a9:0c:56:86:01:03:81:9d:4c:da:7b:32:3a:
-                    1d:e0:aa:c2:d4:6b:89:b7:48:f8:6b:93:5c:d2:a3:
+                    00:e1:35:d5:1b:a1:ce:74:83:fb:8e:aa:86:54:63:
+                    8d:a0:07:9e:67:b2:20:4d:13:0a:0a:4f:79:2a:78:
                     [...]
-                    58:d9:7f:39:dd:fb:af:a3:b7:1b:6e:63:e0:7a:18:
-                    04:af
+                    26:9c:0d:33:d7:06:a1:e6:0c:59:41:56:a3:32:41:
+                    df:df
                 Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: critical
+                CA:FALSE
+            X509v3 Key Usage: critical
+                Digital Signature, Key Encipherment
+            X509v3 Subject Alternative Name:
+                DNS:adder-client-host
     Signature Algorithm: sha256WithRSAEncryption
-         87:e9:fa:39:32:6c:3c:b6:1e:7b:88:82:bf:c2:2f:d7:02:33:
-         a1:43:98:5c:c0:65:b4:0c:72:dc:1b:71:ca:dd:9e:13:a1:26:
+         17:29:27:d8:97:69:bf:bd:33:a2:cc:6d:18:dd:99:03:5b:57:
+         92:ec:c4:86:40:f2:6d:64:80:b4:48:a6:9c:b9:de:db:d7:d9:
          [...]
-         6a:85:29:c6:d8:fc:7f:8f:a9:b2:46:ff:47:c2:90:61:bf:9e:
-         96:d4:71:82
-```
+         d9:64:36:ea:8f:70:1e:ae:c7:68:54:ec:3b:fc:84:51:d2:7e:
+         58:6f:ba:47
+-----BEGIN CERTIFICATE-----
+MIIDnjCCAoagAwIBAgIBATANBgkqhkiG9w0BAQsFADCBgTELMAkGA1UEBhMCVVMx
+CzAJBgNVBAgMAldBMRUwEwYDVQQKDAxFeGFtcGxlIENvcnAxFDASBgNVBAsMC0Vu
+[...]
+aluyJy8VtkIao7qmhydcnrgezZh5TxhnqzNYmd0SdKkzk0IUqO9zTFQgwM/ZZDbq
+j3AersdoVOw7/IRR0n5Yb7pH
+-----END CERTIFICATE-----
+</pre>
 
-A few things to notice:
+### Generating a root CA certificate
 
-* The `Issuer` and the `Subject` field are the same. This makes it a self-signed certificate.
+### Generating an intermediate CA certificate
 
-* The certificate is signed by the issuer (once again, self-signed). We can use the public key of
-  the issuer (which is in the certificate itself) to verify that the signature is authentic.
+### Generating self-signed leaf certificate
 
-* Technically, the certificate does not actually contain the public key; instead it contains the
-  parameters (modulus and exponent) that allow the public key (but not the private key) to be
-  computed using the RSA algorithm.
-
+### Generating certificate chains
 
 # Additional Reading
 

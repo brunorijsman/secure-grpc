@@ -5,6 +5,7 @@
         "MTLS",
         "asyncio",
         "datacenter",
+        "extfile",
         "genrsa",
         "grpclib",
         "noout",
