@@ -1345,8 +1345,8 @@ In this example, we will be generating a client certificate signed by an interme
 
 In order to generate a CA-signed leaf certificate, we need two configuration files.
 
-The first configuration file, `admin/intermediate.config` contains most of the information that the
-signing CA needs to generate and sign the certificate:
+The first configuration file, `admin/intermediate.config` contains information about the signing CA,
+which is the intermediate CA in this example.
 
 File `admin/intermediate.config`:
 <pre>
@@ -1374,9 +1374,11 @@ commonName             = supplied
 </pre>
 
 The second configuration file, `admin/client_leaf.ext` in this example describes the constraints
-on how the generated certificate may be used:
+on how the generated certificate may be used. 
+The client, being a leaf, is not a certificate authority and may only use its key for digital
+signatures and encrypting keys.
 
-File admin/client_leaf.ext:
+File `admin/client_leaf.ext`:
 <pre>
 [default]
 basicConstraints = critical, CA:false
@@ -1441,9 +1443,87 @@ j3AersdoVOw7/IRR0n5Yb7pH
 -----END CERTIFICATE-----
 </pre>
 
+### Generating an intermediate CA certificate
+
+In this example, we will be generating an intermediate CA certificate that is signed by a root CA.
+
+In order to generate a root-CA-signed intermediate-CA certificate, we need two configuration files.
+
+The first configuration file, `admin/intermediate.config` contains information about the CA whose
+certificate is being generated.
+We already showed the contents of the file in the previous section.
+
+The second configuration file, `admin/intermediate_ca.ext` in this example describes the constraints
+on how the generated certificate may be used.
+In this case the intermediate CA is a certificate authority and may use its key to sign
+certificates.
+
+File `admin/intermediate_ca.ext`:
+<pre>
+[default]
+basicConstraints = critical,CA:true
+keyUsage         = critical,keyCertSign
+</pre>
+
+Then we use the following OpenSSL command to actually generate the certificate:
+
+<pre>
+$ <b>openssl ca \
+  -batch \
+  -in admin/intermediate.csr \
+  -out certs/intermediate.crt \
+  -config admin/intermediate.config \
+  -extfile admin/intermediate_ca.ext \
+  -days 730</b>
+</pre>
+
+This produces the client certificate in file `certs/intermediate.crt`:
+
+File `certs/intermediate.crt`:
+<pre>
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 1 (0x1)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=Example Corp Root Certificate Authority
+        Validity
+            Not Before: May 27 14:20:20 2021 GMT
+            Not After : May 27 14:20:20 2023 GMT
+        Subject: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=Example Corp Intermediate Certificate Authority
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:ac:18:f9:cc:69:68:fe:05:64:b9:71:36:5b:f9:
+                    8f:43:19:05:9d:f0:c1:89:cb:31:39:ba:b4:c5:40:
+                    [...]
+                    28:05:39:5f:a5:93:a1:c0:12:a0:9d:2c:7a:9b:f0:
+                    7a:fb
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: critical
+                CA:TRUE
+            X509v3 Key Usage: critical
+                Certificate Sign
+    Signature Algorithm: sha256WithRSAEncryption
+         6f:5a:75:74:34:0b:b5:be:aa:da:05:77:4f:da:8b:0f:0f:22:
+         53:00:80:39:a3:ed:d2:92:96:0e:56:a2:33:94:ab:92:cf:42:
+         [...]
+         20:65:76:12:87:f7:74:82:d1:3c:c6:26:07:a8:0a:ea:a5:50:
+         db:97:c7:4c
+-----BEGIN CERTIFICATE-----
+MIIDmTCCAoGgAwIBAgIBATANBgkqhkiG9w0BAQsFADB5MQswCQYDVQQGEwJVUzEL
+MAkGA1UECAwCV0ExFTATBgNVBAoMDEV4YW1wbGUgQ29ycDEUMBIGA1UECwwLRW5n
+[...]
+5ZclAihzXGOiUCyUELOwktkfTqEefPYNA4sWOg0Ffw7YJwNtK8RRIGV2Eof3dILR
+PMYmB6gK6qVQ25fHTA==
+-----END CERTIFICATE-----
+</pre>
+
+
 ### Generating a root CA certificate
 
-### Generating an intermediate CA certificate
 
 ### Generating self-signed leaf certificate
 
