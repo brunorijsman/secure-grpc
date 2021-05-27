@@ -33,8 +33,8 @@ function help ()
     echo "  certificates signed by a root CA, and certificates signed by an intermediate CA."
     echo
     echo "  There are both positive and negative test cases. The positive test cases verify that"
-    echo "  the gRPC client can successfully call the gRPC server when all keys and cerficicates"
-    echo "  correct. The negatite test cases verity that the gRPC client cannot call the gRPC"
+    echo "  the gRPC client can successfully call the gRPC server when all keys and certificates"
+    echo "  correct. The negative test cases verity that the gRPC client cannot call the gRPC"
     echo "  when some private key is incorrect, i.e. does not match the public key in the"
     echo "  certificate."
     echo

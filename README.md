@@ -356,7 +356,7 @@ The client invokes the gRPC service provided by the server.
 When you start the client, it sends a request to add two random numbers to the server, waits for the
 result to come pack, prints the result, and then terminates (the server keeps running).
 
-Use the `--help` command line option to see what command-line options are available and what their
+Use the `--help` command-line option to see what command-line options are available and what their
 meaning is:
 
 <pre>
@@ -405,6 +405,369 @@ Next, we will show how to run the server and client with authentication enabled,
 to explain the script that generates keys and certificates.
 
 ## Generating Keys and Certificates.
+
+The `create-keys-and-certs.sh` bash shell script automates the generation of keys and certificates
+for the server, the client, and certificate authorities (CAs).
+
+Internally, it uses the `openssl` command line utility. We describe the implementation in more
+detail later.
+
+Use the `--help` command-line option to see what command-line options are available and what their
+meaning is:
+
+<pre>
+(venv) $ <b>./create-keys-and-certs.sh --help</b>
+
+SYNOPSIS
+
+    create-keys-and-certs.sh [OPTION]...
+
+DESCRIPTION
+
+  Generate a set of private keys and certificates for the gRPC server and (if mutual
+  authentication is used) also for the gRPC client. The certificates can be self-signed,
+  or signed by a root CA, or signed by an intermediate CA. For negative testing, it is
+  possible to purposely generate a wrong private key (one that does not match the
+  public key in the certificate).
+
+OPTIONS
+
+  --help, -h, -?
+      Print this help and exit
+
+  --authentication {none, server, mutual}, -a {none, server, mutual}
+      none: no authentication.
+      server: the client authenticates the server.
+      mutual: the client and the server mutually authenticate each other.
+      (Default: none)
+
+  --client-name, -c
+      The client hostname. Default: localhost.
+
+  --server-name, -s
+      The server hostname. Default: localhost.
+
+  --signer {self, root, intermediate}, -i {self, root, intermediate}
+      Who signs the certificates:
+      self: server and client certificates are self-signed.
+      root: server and client certificates are signed by the root CA.
+      intermediate: server and client certificates are signed by an intermediate CA; and
+      the intermediate CA certificate is signed by the root CA.
+      (Default: self)
+
+  -x, --clean
+      Remove all private key and certificate files.
+
+  --wrong-key {none, server, client, intermediate, root} -w {none, server, client, intermediate, root}
+      Generate an incorrect private key (this is used for negative testing):
+      none: don't generate an incorrect private key; all private keys are correct.
+      server: generate an incorrect private key for the server.
+      client: generate an incorrect private key for the client.
+      root: generate an incorrect private key for the root CA.
+      intermediate: generate an incorrect private key for the intermediate CA.
+      (Default: none)
+</pre>
+
+The script generates the following files:
+
+* The `certs` subdirectory contains all generated certificates (`.crt` files) and certificate chains
+  (`.pem` files).
+
+* The `keys` subdirectory contains all generated private keys (`.key` files).
+
+* The `admin` subdirectory contains various files that are generated in the process of generating
+  the files, such as OpenSSL configuration files (`.config` and `.ext` files), certificate signing
+  requests (`.csr` files), etc. 
+
+Here is an example of the contents of these directories after generating keys and certificates for
+the server, the client, a root CA, and an intermediate CA:
+
+<pre>
+(venv) $ <b>./create-keys-and-certs.sh --authentication mutual --signer intermediate</b>
+Created root private key
+Created root certificate signing request
+Created root certificate
+Created intermediate private key
+Created intermediate certificate signing request
+Created intermediate certificate
+Created server private key
+Created server certificate signing request
+Created server certificate
+Created server certificate chain
+Created client private key
+Created client certificate signing request
+Created client certificate
+Created client certificate chain
+</pre>
+
+<pre>
+(venv) $ <b>tree certs keys admin</b>
+certs
+├── client.crt
+├── client.pem
+├── intermediate.crt
+├── root.crt
+├── server.crt
+└── server.pem
+keys
+├── client.key
+├── intermediate.key
+├── root.key
+└── server.key
+admin
+├── client.csr
+├── client_leaf.ext
+├── client_req.config
+├── intermediate
+│   ├── 00.pem
+│   ├── 01.pem
+│   ├── database
+│   ├── database.attr
+│   ├── database.attr.old
+│   ├── database.old
+│   ├── index
+│   ├── serial
+│   └── serial.old
+├── intermediate.config
+├── intermediate.csr
+├── intermediate_ca.ext
+├── intermediate_req.config
+├── root
+│   ├── 00.pem
+│   ├── 01.pem
+│   ├── database
+│   ├── database.attr
+│   ├── database.attr.old
+│   ├── database.old
+│   ├── index
+│   ├── serial
+│   └── serial.old
+├── root.config
+├── root.csr
+├── root_ca.ext
+├── root_req.config
+├── server.csr
+├── server_leaf.ext
+└── server_req.config
+
+2 directories, 42 files
+</pre>
+
+Note: each time you generate new keys and certificates, all keys and certificates from the previous
+run are deleted.
+
+Here are some examples of how to generate keys:
+
+### Example: no authentication
+
+The default (i.e. if no command-line options are given) is no authentication. In other words, no
+no keys or certificates are generated, and the keys and certificates from the previous run are
+removed:
+
+<pre>
+(venv) $ <b>./create-keys-and-certs.sh</b>
+No authentication (no keys or certificates generated)
+</pre>
+
+### Example: server-only authentication, self-signed certificates
+
+In the following example, we only generate a key and a certificate for the server. 
+The client is not authenticated, so we do not generate a key or certificate for the client.
+The server certificate is self-signed, so we don't generate any keys or certificates for certificate
+authorities.
+
+<pre>
+(venv) $ <b>./create-keys-and-certs.sh --authentication server --signer self</b>
+Created server certificate (self-signed)
+Created server certificate chain
+</pre>
+
+### Example: mutual authentication, certificates signed by an intermediate certificate authority
+
+In the following, we use mutual authentication. The client authenticates the server, so we need
+a key and a certificate for the server. And the server also authenticates the client, so we need
+a key and a certificate for the client.
+
+Both the server and the client certificate are signed by an intermediate certificate authority (CA).
+So, we need a key and a certificate for this intermediate CA.
+The certificate of the intermediate CA is signed by a root CA.
+So, we need a key and a certificate for this root CA.
+The certificate of the root CA is self-signed.
+
+<pre>
+(venv) $ <b>./create-keys-and-certs.sh --authentication mutual --signer intermediate</b>
+Created root private key
+Created root certificate signing request
+Created root certificate
+Created intermediate private key
+Created intermediate certificate signing request
+Created intermediate certificate
+Created server private key
+Created server certificate signing request
+Created server certificate
+Created server certificate chain
+Created client private key
+Created client certificate signing request
+Created client certificate
+Created client certificate chain
+</pre>
+
+### Example: select server name and client name
+
+By default the name of the server in the server certificate is `localhost`.
+Similarly, by default the name of the client in the client certificate is `localhost`.
+This is appropriate when (a) authentication is host-based and (b) the server and the client are
+running on the same host.
+
+When authentication is service-based or when the server and client are running on different hosts
+you want to explicitly choose the name of the server and the name of the client in the certificates.
+You can do this using the `--server-name` and `--client-name` command line options.
+
+<pre>
+(venv) $ <b>./create-keys-and-certs.sh --authentication mutual --signer intermediate --server-name alice --client-name bob</b>
+Created root private key
+Created root certificate signing request
+Created root certificate
+Created intermediate private key
+Created intermediate certificate signing request
+Created intermediate certificate
+Created server private key
+Created server certificate signing request
+Created server certificate
+Created server certificate chain
+Created client private key
+Created client certificate signing request
+Created client certificate
+Created client certificate chain
+</pre>
+
+### Example: purposely generating a wrong key
+
+The automated test script (which is described in detail below) does not only do positive test cases
+but also negative test cases:
+* In a positive test case, we verify that the client can communicate with the server when the
+  authentication keys and certificates are correct.
+* In a negative test case, we verify that the client cannot communicate with the server when the
+  authentication keys and certificates are incorrect. Not being able to communicate is the desired
+  behavior in this case.
+
+The `--wrong-key` command-line argument is used to generate a wrong key on purpose to facilitate
+negative testing. The following arguments are available:
+* `--wrong-key none`: don't generate any wrong keys (the default behavior).
+* `--wrong-key client`: generate a wrong key for the client.
+* `--wrong-key server`: generate a wrong key for the server.
+* `--wrong-key intermediate`: generate a wrong key for the intermediate CA.
+* `--wrong-key root`: generate a wrong key for the root CA.
+
+The exact definition of a wrong key is slightly different for leaves (the server and client) versus
+CAs (the intermediate CA and root CA):
+* Generating a wrong key for a leaf means that the private key does not match the public key in the
+  certificate.
+* When generating a wrong key for a CA, the CA private key still matches the CA public key in the CA
+  certificate. However, the private CA key does not match the private key that was used for signing
+  other certificates.
+
+In the following example, we purposely generate a wrong key for the client. Notice that the client
+private key is generate twice: one before the certificate is generated and then again after the
+certificate is generated. As a result the client private key does not match the public key in the
+certificate.
+
+<pre>
+(venv) $ <b>./create-keys-and-certs.sh --authentication mutual --signer root --wrong-key client</b>
+Created root private key
+Created root certificate signing request
+Created root certificate
+Created server private key
+Created server certificate signing request
+Created server certificate
+Created server certificate chain
+<i>Created client private key</i>
+Created client certificate signing request
+Created client certificate
+Created client certificate chain
+<i>Created client private key</i>
+</pre>
+
+
+
+
+As you can see there are almost endless variations and permutations for authentication, which
+brings us to the next topic...
+
+
+## Automated Testing of Authentication
+
+The `test.sh` bash shell script automates the testing all possible combinations and permutations
+of client to server authentication.
+
+The `--help` command-line option describes what it does and what command-line options are available:
+
+<pre>
+(venv) $ ./test.sh --help
+
+SYNOPSIS
+
+    test.sh [OPTION]...
+
+DESCRIPTION
+
+  Test authentication between the gRPC client and the gRPC server.
+
+  The following authentication methods are tested: no authentication, server
+  authentication (the client authenticates the server, but not vice versa), and mutual
+  authentication (the client and the server mutually authenticate each other).
+
+  The following certificate signing methods are tested: self-signed certificates,
+  certificates signed by a root CA, and certificates signed by an intermediate CA.
+
+  There are both positive and negative test cases. The positive test cases verify that
+  the gRPC client can successfully call the gRPC server when all keys and certificates
+  correct. The negative test cases verity that the gRPC client cannot call the gRPC
+  when some private key is incorrect, i.e. does not match the public key in the
+  certificate.
+
+  The tests are run in two environments: local and docker. The local test runs the server
+  and client as local processes on localhost. The docker test runs the server and client
+  in separate docker containers, each with a different DNS name.
+
+  The server can identify itself using the DNS name of the host on which it runs, or
+  it can use the TLS server name indication (SNI) to identify itself using a service
+  name.
+
+  We use two different clients for testing: client.py in this repo and Evans
+  (https://github.com/ktr0731/evans)
+
+OPTIONS
+
+  --help, -h, -?
+      Print this help and exit
+
+  --skip-evans
+      Skip the Evans client test cases.
+
+  --skip-docker
+      Skip the docker test cases.
+
+  --skip-negative
+      Skip the negative test cases.
+
+  --verbose, -v
+      Verbose output; show all executed commands and their output.
+</pre>
+
+To run all test cases, simple invoke the `test.sh` script without any parameters:
+
+<pre>
+@@@
+</pre>
+
+On my 2020 MacBook Air, it takes about 12 minutes to complete the full test suite.
+
+If you don't have Docker of Evans installed on your computer, use the corresponding `--skip-...`
+command line option to skip those test cases.
+
+
+
 
 
 # ** CONTINUE FROM HERE **
