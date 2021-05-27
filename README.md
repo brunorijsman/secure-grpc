@@ -689,17 +689,103 @@ Created client certificate chain
 <i>Created client private key</i>
 </pre>
 
+As you can see there are almost endless variations for authentication.
+For this reason we have an automated test script (which is described later) to automate trying
+all possible combinations.
 
+## Using Docker
 
+So far we have run the server and the client locally from our bash shell. In this scenario, both the
+server and the client use `localhost` as the DNS host name.
 
-As you can see there are almost endless variations and permutations for authentication, which
-brings us to the next topic...
+To test other host names we run the server and the client in different Docker containers and connect
+the two containers using a Docker network.
 
+We have created some convenience bash shell scripts to make starting and stopping these containers
+easier.
+
+The `docker/docker-build.sh` script builds the Docker image. 
+
+<pre>
+(venv) $ <b>docker/docker-build.sh</b>
+Sending build context to Docker daemon  10.24kB
+Step 1/11 : FROM ubuntu:20.04
+ ---> 7e0aa2d69a15
+Step 2/11 : RUN apt-get update -y
+ ---> Using cache
+ ---> 2aad84ffaf70
+Step 3/11 : RUN apt-get install -y python3
+ ---> Using cache
+ ---> 92d2bca80ac8
+Step 4/11 : RUN apt-get install -y python3-pip
+ ---> Using cache
+ ---> 0b7733fd6768
+Step 5/11 : RUN apt-get install -y net-tools
+ ---> Using cache
+ ---> 827ca4a7fd94
+Step 6/11 : RUN apt-get install -y wget
+ ---> Using cache
+ ---> 81efc9d4bb38
+Step 7/11 : COPY requirements.txt requirements.txt
+ ---> Using cache
+ ---> 4cc74fc4b6f3
+Step 8/11 : RUN pip3 install -r requirements.txt
+ ---> Using cache
+ ---> a6c713091119
+Step 9/11 : RUN wget https://github.com/ktr0731/evans/releases/download/0.9.3/evans_linux_amd64.tar.gz
+ ---> Using cache
+ ---> 9022f0e45772
+Step 10/11 : RUN tar xvf evans_linux_amd64.tar.gz
+ ---> Using cache
+ ---> 3dc5f33f2db5
+Step 11/11 : VOLUME /host
+ ---> Using cache
+ ---> 4a8666ff31f1
+Successfully built 4a8666ff31f1
+Successfully tagged secure-grpc:latest
+</pre>
+
+Note that we do not package the client or server Python code nor the generated keys and
+certificates into the Docker image. 
+Instead, the Docker image mounts a directory in the container to the host file system.
+This way, we don't have to rebuild the Docker image each time we change the code or each time we
+generate new keys and certificates.
+
+The `docker/docker-server.sh` script starts the server in a Docker container. 
+The host name of this Docker container is `adder-server-host`. 
+The script also creates a Docker network named `secure-grpc-net` and assigns IP address
+`172.30.0.2/16` to the server.
+Here we start the server in the background so that we can start the client in the same terminal
+window.
+
+<pre>
+(venv) $ <b>docker/docker-server.sh</b> &
+[1] 31244
+</pre>
+
+The `docker\docker-client.sh` script starts the client in a Docker container.
+The host name of this Docker container is `adder-client-host`. 
+The script attaches the client to the `secure-grpc-net` Docker network and assigns IP address
+`172.30.0.3/16` to the client.
+
+<pre>
+(venv) $ docker/docker-client.sh
+Client: No authentication
+Client: connect to adder-server-host:50051
+Client: 5052 + 2161 = 7213
+</pre>
+
+The `docker\docker-cleanup.sh` script cleans up any Docker containers and Docker networks left
+behind by previous runs.
+
+<pre>
+(venv) $ ./docker/docker-cleanup.sh
+</pre>
 
 ## Automated Testing of Authentication
 
-The `test.sh` bash shell script automates the testing all possible combinations and permutations
-of client to server authentication.
+The `test.sh` bash shell script automates the testing all possible combinations of client to server
+authentication.
 
 The `--help` command-line option describes what it does and what command-line options are available:
 
@@ -767,7 +853,7 @@ Pass: wrong_client_test_case: location=docker client=evans authentication=mutual
 Pass: wrong_client_test_case: location=docker client=evans authentication=mutual signer=intermediate
 All 232 test cases passed</pre>
 
-On my 2020 MacBook Air, it takes about 12 minutes to complete the full test suite.
+On my 2020 MacBook Air, it takes about 9 minutes to complete the full test suite.
 
 If you don't have Docker of Evans installed on your computer, use the corresponding `--skip-...`
 command line option to skip those test cases.
