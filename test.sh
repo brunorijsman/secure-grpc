@@ -12,6 +12,7 @@ VERBOSE=$FALSE
 SKIP_EVANS=$FALSE
 SKIP_DOCKER=$FALSE
 SKIP_NEGATIVE=$FALSE
+TEST_CASES_PASSED=0
 TEST_CASES_FAILED=0
 
 function help ()
@@ -394,6 +395,7 @@ function correct_key_test_case_check_client ()
     if client_to_server_call $location $client $authentication $signer $server_naming \
         $check_client_naming; then
         echo "${GREEN}Pass${NORMAL}: $description"
+        ((TEST_CASES_PASSED = TEST_CASES_PASSED + 1))
     else
         echo "${RED}Fail${NORMAL}: $description"
         ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
@@ -468,6 +470,7 @@ function wrong_key_test_case ()
         ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     else
         echo "${GREEN}Pass${NORMAL}: $description"
+        ((TEST_CASES_PASSED = TEST_CASES_PASSED + 1))
     fi
 }
 
@@ -521,6 +524,7 @@ function wrong_client_test_case ()
         ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     else
         echo "${GREEN}Pass${NORMAL}: $description"
+        ((TEST_CASES_PASSED = TEST_CASES_PASSED + 1))
     fi
 }
 
@@ -574,7 +578,9 @@ if [[ $SKIP_DOCKER == $FALSE ]]; then
 fi
 
 if [[ $TEST_CASES_FAILED == 0 ]]; then
-    echo "${GREEN}All test cases passed${NORMAL}"
+    echo "${GREEN}All $TEST_CASES_PASSED test cases passed${NORMAL}"
 else
-    echo "${RED}$TEST_CASES_FAILED test cases failed${NORMAL}"
+    msg="${RED}$TEST_CASES_FAILED test cases failed${NORMAL}"
+    msg="$msg and ${GREEN}$TEST_CASES_PASSED test cases passed${NORMAL}"
+    echo $msg
 fi
