@@ -18,7 +18,8 @@ This repository contains the following example code for securing Google Remote P
 # Authentication Schemes
 
 Our code supports multiple authentication schemes. The scheme is determined by the combination of
-the parameters listed below. The test scrips tests all possible parameter combinations.
+the parameters listed below. 
+The test script (which is described in detail later) tests all possible parameter combinations.
 
 ## Authenticated Parties
 
@@ -1096,20 +1097,7 @@ A few things to notice:
   computed using the RSA algorithm.
 
 
-
-
-TODO: Install server certificate on client
-
-TODO: 127.0.0.1 vs hostname etc (two different virtual machines)
-
-TODO: Diagram explaining certificates
-
-TODO: Update client code load certificate
-
-TODO: Update server code to update server certificate and private key
-
-
-# References
+# Additional Reading
 
 * [gRPC Authentication Guide](https://grpc.io/docs/guides/auth/)
 
@@ -1124,5 +1112,3 @@ TODO: Update server code to update server certificate and private key
 * [grpclib Homepage](https://pypi.org/project/grpclib/) [Note]
 
 * [grpclib GitHub Page](https://github.com/vmagamedov/grpclib) [Note]
-
-Note: This tutorial uses grpcio; it does not use grpclib.

@@ -13,6 +13,8 @@ class Adder(adder_pb2_grpc.AdderServicer):
         self._args = args
 
     async def _validate_client(self, context):
+        if self._args.authentication != "mutual":
+            return
         if self._args.client_name is None:
             return
         encoded_allowed_client_name = self._args.client_name.encode()

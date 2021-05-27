@@ -167,7 +167,7 @@ function create_keys_and_certs ()
     if [[ ${signer} != "none" ]]; then
         command="$command --signer $signer"
     fi
-    if [[ $location == local ]]; then
+    if [[ $location == "local" ]]; then
         if [[ $server_naming == "service" ]]; then
             command="$command --server-name adder-server-service"
         else
@@ -200,7 +200,7 @@ function start_server ()
     local location=$1
     local authentication=$2
     local signer=$3
-    local check_client_naming=$4 ### use it: host, service, dont_check
+    local check_client_naming=$4
     local server_pid_return_var=$5
 
     local options="--authentication $authentication"
@@ -211,14 +211,27 @@ function start_server ()
             options="$options --signer ca"
         fi
     fi
-    if [[ $location == local ]]; then
+    if [[ $location == "local" ]]; then
         options="$options --server-host localhost"
     else
         options="$options --server-host adder-server-host"
     fi
+    if [[ $check_client_naming == "dont_check" ]]; then
+        :
+    elif [[ $check_client_naming == "host" ]]; then
+        if [[ $location == "local" ]]; then
+            options="$options --client-name localhost"
+        else
+            options="$options --client-name adder-client-host"
+        fi
+    elif [[ $check_client_naming == "service" ]]; then
+        options="$options --client-name adder-client-service"
+    elif [[ $check_client_naming == "wrong" ]]; then
+        options="$options --client-name wrong-client-name"
+    fi
 
     local start_server_pid
-    if [[ $location == local ]]; then
+    if [[ $location == "local" ]]; then
         start_process "./server.py $options" start_server_pid
     else
         start_process "docker/docker-server.sh $options" start_server_pid
@@ -240,7 +253,7 @@ function stop_server ()
 
     kill ${server_pid} 2>/dev/null
     wait ${server_pid} 2>/dev/null
-    if [[ $location == docker ]]; then
+    if [[ $location == "docker" ]]; then
         local server_container_id=$(docker ps --filter name=adder-server-host --quiet)
         if [[ $server_container_id != "" ]]; then
             docker rm --force $server_container_id >/dev/null
@@ -255,12 +268,12 @@ function python_client_to_server_call ()
     local authentication=$3
     local signer=$4
     local server_naming=$5
-    local check_client_naming=$6   # Use it; always validate client if mutual
+    local check_client_naming=$6
 
     start_server $location $authentication $signer $check_client_naming server_pid
     
     local command
-    if [[ $location == local ]]; then
+    if [[ $location == "local" ]]; then
         command="./client.py"
     else
         command="docker/docker-client.sh"
@@ -273,12 +286,12 @@ function python_client_to_server_call ()
     else
         command="$command --signer ca"
     fi
-    if [[ $location == local ]]; then
+    if [[ $location == "local" ]]; then
         command="$command --server-host localhost"
     else
         command="$command --server-host adder-server-host"
     fi
-    if [[ $server_naming == service ]]; then
+    if [[ $server_naming == "service" ]]; then
         command="$command --server-name adder-server-service"
     fi
 
@@ -301,12 +314,12 @@ function evans_client_to_server_call ()
     local authentication=$3
     local signer=$4
     local server_naming=$5
-    local check_client_naming=$6   # Use it; always validate client if mutual
+    local check_client_naming=$6
 
     start_server $location $authentication $signer $check_client_naming server_pid
 
     local command
-    if [[ $location == local ]]; then
+    if [[ $location == "local" ]]; then
         command="evans --proto adder.proto cli call --host localhost"
     else
         command="docker/docker-evans.sh"
@@ -321,11 +334,11 @@ function evans_client_to_server_call ()
         if [[ $authentication == "mutual" ]]; then
             command="$command --cert certs/client.pem --certkey keys/client.key"
         fi
-        if [[ $server_naming == service ]]; then
+        if [[ $server_naming == "service" ]]; then
             command="$command --servername adder-server-service"
         fi
     fi
-    if [[ $location == local ]]; then
+    if [[ $location == "local" ]]; then
         command="$command adder.Adder.Add"
         command="$command <<< '{\"a\": \"1\", \"b\":\"2\"}'"
     fi
@@ -351,7 +364,7 @@ function client_to_server_call ()
     local server_naming=$5
     local check_client_naming=$6
 
-    if [[ $client == python ]]; then
+    if [[ $client == "python" ]]; then
         python_client_to_server_call $location $client $authentication $signer $server_naming \
             $check_client_naming
     else
@@ -376,11 +389,10 @@ function correct_key_test_case_check_client ()
     description="$description authentication=$authentication signer=$signer"
     description="$description server_naming=$server_naming"
     description="$description client_naming=$client_naming"
-    description="$description check_client_naming=dont_check"
+    description="$description check_client_naming=$check_client_naming"
 
-    ###
     if client_to_server_call $location $client $authentication $signer $server_naming \
-        dont_check; then
+        $check_client_naming; then
         echo "${GREEN}Pass${NORMAL}: $description"
     else
         echo "${RED}Fail${NORMAL}: $description"
@@ -400,8 +412,10 @@ function correct_key_test_case ()
     correct_key_test_case_check_client $location $client $authentication $signer \
         $server_naming $client_naming dont_check
 
-    correct_key_test_case_check_client $location $client $authentication $signer \
-        $server_naming $client_naming dont_check
+    if [[ $authentication == "mutual" ]]; then
+        correct_key_test_case_check_client $location $client $authentication $signer \
+            $server_naming $client_naming $client_naming
+    fi
 }
 
 
@@ -449,7 +463,7 @@ function wrong_key_test_case ()
     description="$description authentication=$authentication signer=$signer wrong_key=$wrong_key"
 
     # Since the key is wrong, we expect the call to fail and the test case passes if the call fails
-    if client_to_server_call $location $client $authentication $signer host host; then
+    if client_to_server_call $location $client $authentication $signer host dont_check; then
         echo "${RED}Fail${NORMAL}: $description"
         ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
     else
@@ -502,13 +516,12 @@ function wrong_client_test_case ()
     description="$description authentication=$authentication signer=$signer"
 
     # Authenticate the client using the wrong client name. This should fail.
-    ### TODO: Implement this
-    # if client_to_server_call $location $client $authentication $signer host service; then
-    #     echo "${RED}Fail${NORMAL}: $description"
-    #     ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
-    # else
-    echo "${GREEN}TODO${NORMAL}: $description"
-    # fi
+    if client_to_server_call $location $client $authentication $signer host wrong; then
+        echo "${RED}Fail${NORMAL}: $description"
+        ((TEST_CASES_FAILED = TEST_CASES_FAILED + 1))
+    else
+        echo "${GREEN}Pass${NORMAL}: $description"
+    fi
 }
 
 function wrong_client_test_cases_group ()
