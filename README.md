@@ -76,19 +76,21 @@ was introduced).
 Using self-signed "private" root CAs is common for accessing resources (such as APIs) within the
 context of an enterprise. 
 
-## Server Name Indication (SNI)
+## Server Name Check
 
-When the client authenticates the server, it can perform the **server naming check** in one of two
+When the client authenticates the server, it can perform the **server name check** in one of two
 ways:
 
 * The client verifies that the server name in the certificate matches the DNS host name of the
   server. This default behavior of TLS. We refer to this as **server host naming** in our code.
 
-* The client uses the TLS Server Name Indication (SNI) option to explicitly choose the server name
-  to be authenticated. Historically, this was typically used when multiple different web sites where
-  hosted on a single web servers. The web server used the SNI option to present the correct
-  certificate to the client. In the context of APIs, it allows us to decouple the naming of services
-  from hosts. Hence, we refer to this as **server service naming** in our code.
+* The client uses the TLS **Server Name Indication** (SNI) option to explicitly choose the server
+  name to be authenticated.
+  Historically, this was typically used when multiple different web sites where hosted on a single
+  web server.
+  The web server used the SNI option to present the correct certificate to the client.
+  In the context of APIs, it allows us to decouple the naming of service from hosts.
+  Hence, we refer to this as **server service naming** in our code.
 
 Note: our code stores and checks the authenticated name of a leaf in both the Common Name (CN) field
 of the certificate (for compatibility with older code) and in the Subject Alternative Name (SAN)
@@ -125,11 +127,12 @@ We refer to this as the optional **client name check**.
   to human-to-application communications) it is common to use TLS for both parties to authenticate
   each other. Not only does the client authenticate the server, but the server also authenticates
   the client.
+  mTLS is not really a separate protocol; it is just a specific way of using TLS.
 
 * [Application Layer Transport Security (**ALTS**)](https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security) 
   is a mutual authentication and transport encryption system developed by Google and typically used
   for securing Remote Procedure Call (RPC) communications within Google's infrastructure. ALTS 
-  is similar in concept to MTLS but has been designed and optimized to meet the needs of Google's
+  is similar in concept to mTLS but has been designed and optimized to meet the needs of Google's
   datacenter environments.
 
 * GRPC also supports **token-based authentication** which is intended to be used in Google APIs
@@ -139,34 +142,66 @@ We currently only support TLS and mTLS version 1.3. We do not yet support ALTS o
 
 # Using the Example Code
 
-## Installation Instructions
+## Prerequisites
 
-The steps to install the code are as follows (we have tested these steps on macOS Catalina 10.15.7
-and on Linux Ubuntu @@@) but they should work on other UNIX-ish platforms as well.
+You must have to following software installed on your computer to run the software in this
+repository.
 
-Make sure that you have `git` installed:
+Make sure that `git` is installed:
 
 <pre>
 $ <b>git --version</b>
 git version 2.29.2
 </pre>
 
-Make sure that you have `Python` version 3.8 or later installed:
+Make sure that `Python` version 3.8 or later is installed:
 
 <pre>
 $ <b>python --version</b>
 Python 3.8.7
 </pre>
 
-Make sure that you have `pip` installed:
+Make sure that `pip` is installed:
 
 <pre>
 $ <b>pip --version</b>
 pip 20.2.3 from /Users/brunorijsman/.pyenv/versions/3.8.7/lib/python3.8/site-packages/pip (python 3.8)
 </pre>
 
-The test script uses Docker to test running the server and client in different hosts
-(you can disable this using the `)
+Make sure `OpenSSL` is installed (in this output we see `LibreSSL` which is a particular flavor of
+`OpenSSL`):
+
+<pre>
+$ <b>openssl version</b>
+LibreSSL 2.8.3
+</pre>
+
+Our test script uses [Docker](https://www.docker.com/) to test running the server and client in 
+different hosts.
+If you don't have Docker installed, you can skip the Docker-based test cases using the
+`--skip-docker` command-line option for the test script.
+To check if Docker is installed:
+
+<pre>
+$ <b>docker --version</b>
+Docker version 19.03.8, build afacb8b
+</pre>
+
+Our test script uses the [Evans](https://github.com/ktr0731/evans), which is an interactive gRPC
+client, to test interoperability with third-party software.
+If you don't have Evans installed, you can skip the Evans-based test cases using the
+`--skip-evans` command-line option for the test script.
+To check if Evans is installed:
+
+<pre>
+$ <b>evans --version</b>
+evans 0.9.3
+</pre>
+
+## Installation Instructions
+
+The steps to install the code are as follows. We have tested these steps on macOS 10.15.7 Catalina
+and on Linux Ubuntu 20.04 Focal Fossa but they should work on other UNIX-ish platforms as well.
 
 Clone this GitHub repository:
 
@@ -221,7 +256,8 @@ Installing collected packages: pip
 Successfully installed pip-21.1.2
 </pre>
 
-You have completed the installation. The make sure it was successful you can invoke the server
+You have completed the installation.
+To make sure the installation was successful you can invoke the server
 help:
 
 <pre>
@@ -231,6 +267,145 @@ usage: server.py [-h] [--authentication {none,server,mutual}] [--client-name CLI
 Secure gRPC demo server
 [...]
 </pre>
+
+## Running the Server
+
+The server runs a simple gRPC service for adding numbers
+(we describe the implementation in detail later).
+It waits for requests from clients to add two numbers, and returns the result.
+
+Use the `--help` command line option to see what command-line options are available and what their
+meaning is:
+
+<pre>
+(venv) $ <b>./server.py --help</b>
+usage: server.py [-h] [--authentication {none,server,mutual}] [--client-name CLIENT_NAME] [--server-host SERVER_HOST] [--server-port SERVER_PORT] [--signer {self,ca}]
+
+Secure gRPC demo server
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --authentication {none,server,mutual}, -a {none,server,mutual}
+                        Authentication: none, server, or mutual (default: none)
+  --client-name CLIENT_NAME, -C CLIENT_NAME
+                        Only allow specified client name to connect (default: allow any client)
+  --server-host SERVER_HOST, -s SERVER_HOST
+                        The server host name (default: localhost)
+  --server-port SERVER_PORT, -p SERVER_PORT
+                        The server port (default: 50051)
+  --signer {self,ca}, -i {self,ca}
+                        Signer for server and client certificates: self or ca (certificate authority) (default: self)
+</pre>
+
+For now, we will start the server without any command-line options.
+The default behavior is to _not_ do any authentication, so we don't need to create any keys or
+certificates before starting the server.
+We will see example with authentication later on.
+
+<pre>
+(venv) <b>$ ./server.py</b>
+Server: No authentication
+Server: listening on localhost:50051
+</pre>
+
+The output indicates that:
+* There is no authentication.
+* The server is running on DNS host name `localhost` and listening on TCP port `50051` for incoming
+  requests from the client.
+
+You will not your shell prompt back as the server is a long-running process waiting for incoming
+client requests.
+
+You will need to start another terminal shell for starting the client. Don't forget to activate
+the virtual environment again in the new terminal:
+
+<pre>
+$ <b>cd secure-grpc</b>
+$ <b>source venv/bin/activate</b>
+(venv) $
+</pre>
+
+Or you will need to run the server in as a background process:
+
+<pre>
+(venv) $ <b>./server.py &</b>
+[1] 73734
+Server: No authentication
+Server: listening on localhost:50051
+(venv) $ 
+</pre>
+
+If you start the server as a background process, you can stop the server by killing it:
+
+<pre>
+(venv) $ <b>ps</b>
+  PID TTY           TIME CMD
+ 2882 ttys000    0:00.59 -bash
+34500 ttys003    0:00.08 -bash
+73734 ttys003    0:00.17 python ./server.py
+(venv) $ <b>kill 73734</b>
+[1]+  Terminated: 15          ./server.py
+(venv) $
+</pre>
+
+For now, leave the server running so that we can start the client.
+
+## Running the Client
+
+The client invokes the gRPC service provided by the server.
+When you start the client, it sends a request to add two random numbers to the server, waits for the
+result to come pack, prints the result, and then terminates (the server keeps running).
+
+Use the `--help` command line option to see what command-line options are available and what their
+meaning is:
+
+<pre>
+(venv) $ <b>./client.py --help</b>
+usage: client.py [-h] [--authentication {none,server,mutual}] [--server-host SERVER_HOST] [--server-name SERVER_NAME] [--server-port SERVER_PORT] [--signer {self,ca}]
+
+Secure gRPC demo client
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --authentication {none,server,mutual}, -a {none,server,mutual}
+                        Authentication: none, server, or mutual (default: none)
+  --server-host SERVER_HOST, -s SERVER_HOST
+                        The server host name (default: localhost)
+  --server-name SERVER_NAME, -S SERVER_NAME
+                        Server name override, if different from the server host name
+  --server-port SERVER_PORT, -p SERVER_PORT
+                        The server port (default: 50051)
+  --signer {self,ca}, -i {self,ca}
+                        Signer for server and client certificates: self or ca (certificate authority) (default: self)
+</pre>
+
+Once again, for now, we will run the client without any command line options (we are assuming that
+the server is still running, as described above).
+
+<pre>
+(venv) $ ./client.py
+Client: No authentication
+Client: connect to localhost:50051
+Client: 4648 + 6355 = 11003
+</pre>
+
+The client output indicates that:
+* The client initiated a gRPC session to the server running host host name `localhost` and TCP port
+  `50051`, without authentication.
+* The client picked two random numbers, sent a request to the server to add them, waiting for the
+  result, and printed the result.
+
+Meanwhile, the server prints the received request and result:
+
+<pre>
+Server: 4648 + 6355 = 11003
+</pre>
+
+Next, we will show how to run the server and client with authentication enabled, but first we have
+to explain the script that generates keys and certificates.
+
+## Generating Keys and Certificates.
+
 
 # ** CONTINUE FROM HERE **
 
@@ -571,7 +746,7 @@ TODO: Update client code load certificate
 TODO: Update server code to update server certificate and private key
 
 
-# Documentation references
+# References
 
 * [gRPC Authentication Guide](https://grpc.io/docs/guides/auth/)
 
