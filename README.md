@@ -759,8 +759,13 @@ OPTIONS
 To run all test cases, simple invoke the `test.sh` script without any parameters:
 
 <pre>
-@@@
-</pre>
+(venv) $ time ./test.sh
+Pass: correct_key_test_case: location=local client=python authentication=none signer=none server_naming=host client_naming=host check_client_naming=dont_check
+Pass: correct_key_test_case: location=local client=python authentication=server signer=self server_naming=host client_naming=host check_client_naming=dont_check
+[... 228 lines cut ...]
+Pass: wrong_client_test_case: location=docker client=evans authentication=mutual signer=root
+Pass: wrong_client_test_case: location=docker client=evans authentication=mutual signer=intermediate
+All 232 test cases passed</pre>
 
 On my 2020 MacBook Air, it takes about 12 minutes to complete the full test suite.
 
