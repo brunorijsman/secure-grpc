@@ -858,15 +858,13 @@ On my 2020 MacBook Air, it takes about 9 minutes to complete the full test suite
 If you don't have Docker of Evans installed on your computer, use the corresponding `--skip-...`
 command line option to skip those test cases.
 
-
-
-
-
-# ** CONTINUE FROM HERE **
-
 # Implementation Details
 
-## Grpcio versus grpclib
+## Asynchronous Python
+
+The server and the client are written in Python. It has been tested using Python 3.8. The code is
+asynchronous, i.e. it uses the `async` and `await` keywords. The scripts to generate keys and
+certificates and the test script are written as `bash` shell scripts.
 
 In this tutorial we use the official
 [Python gRPC AsyncIO API](https://grpc.github.io/grpc/python/grpc_asyncio.html),
@@ -877,55 +875,18 @@ in the official [gRPC implementation](https://grpc.io/).
 There is also an older third-party implementation of the Python gRPC AsyncIO API, knows as 
 "[grpclib](https://pypi.org/project/grpclib/)"
 ([GitHub repo](https://github.com/vmagamedov/grpclib)).
-We won't be using this library. Many code fragments that show up in Google or StackOverflow search
+We have not used this library. Many code fragments that show up in Google or StackOverflow search
 results are based on grpclib instead of grpcio and won't work with the code in this tutorial. Be
 careful!
 
-## Setup
+Most of the concepts in this article are language independent, and the Python code should be easy
+to port to other gRPC language bindings.
 
-The following steps describe how to setup the environment for following this tutorial.
+## The Service Definition
 
-Clone the `secure-grp` GitHub repository.
-
-```
-git clone https://github.com/brunorijsman/secure-grpc.git
-```
-
-Create a Python virtual environment and activate it. We use Python3.8 but later versions should work
-as well.
-
-```
-cd secure-grpc
-python3.8 -m venv venv
-source venv/bin/activate
-```
-
-Install the dependencies:
-
-```
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-You will also need `OpenSSL`. I run macOS Catalina 10.15.7 which comes with LibreSSL version 2.8.3
-pre-installed:
-
-<pre>
-$ <b>which openssl</b>
-/usr/bin/openssl
-$ <b>openssl version</b>
-LibreSSL 2.8.3
-</pre>
-
-## The unsecured `Adder` service.
-
-We start with an unsecured gRPC service.
-This will help us understand the basics of writing gRPC servers and clients in asynchronous Python
-before we introduce the extra complications of authentication and encryption, which we will cover in
-later sections.
-
-The repository already contains the gRPC service definition file `adder.proto` which defines a
-very simple `Adder` service that can add two numbers.
+Our example server offers a very simple `Adder` service that can only add two numbers and return
+the sum. 
+It is defined in file `adder.proto`:
 
 ```protobuf
 syntax = "proto3";
@@ -946,85 +907,153 @@ service Adder {
 }
 ```
 
-Run the protobuf compiler.
-
-```bash
-python -m grpc_tools.protoc --proto_path=. --python_out=. --grpc_python_out=. adder.proto 
-```
-
-This compiles the gRPC service definition file `adder.proto` and generates two Python module files:
+The bash script `compile-proto.sh` compiles the gRPC service definition file `adder.proto` and 
+generates two Python module files:
 
 * Python module `adder_pb2.py` defines the protobuf message classes `AddRequest` and `AddReply`.
 
 * Python module `adder_pb2_grpc.py` defines the class `AdderServicer` for the server and the
   class `AdderStub` for the client.
 
-Existing file `server.py` contains the implementation of the server. At this point we
-don't have any authentication or encryption yet.
+The generated files have already been checked in to the git repository, so there is no need to run
+the `compile-proto.sh` script unless you change the `adder.proto` file.
+
+## The Server Implementation
+
+The Python script `server.py` contains the implementation of the server.
+Although the script is not very long, we only highlight some of the most important code fragments
+here.
+
+First, we create a gRPC AIO server:
 
 ```python
-import asyncio
-import grpc
-import adder_pb2
-import adder_pb2_grpc
+server = grpc.aio.server()
+```
 
+We need to add a port to the server to listen for incoming connections.
+We need to assign an host name or host address and a TCP port to that port.
+Here we use some hard-coded values for the sake of example (in the real code it is configurable
+using command-line arguments)
+
+```python
+server_address = "adder-server-host:50051"
+```
+
+If we are not doing authentication, we need to add an insecure port:
+
+```python
+server.add_insecure_port(server_address)
+```
+
+If we are doing authentication, we need to create some credentials (this is explained below) and
+add a secure port.
+
+```python
+credentials = make_credentials() # Function make_credentials is below.
+server.add_secure_port(server_address, credentials)
+```
+
+Once a port is added, we call function `adder_pb2_grpc.add_AdderServicer_to_server` to register
+the class that will service the incoming requests from clients.
+Recall that module `adder_pb2_grpc` was generated by the gRPC compiler from the `adder.proto`
+model file. Class `Adder` is explained below.
+
+```python
+adder_pb2_grpc.add_AdderServicer_to_server(Adder(), server) # Class Adder is below.
+```
+Finally, we start the server:
+
+```python
+await server.start()
+```
+Now, let's return to generating the credentials.
+
+We are doing server authentication (as opposed to mutual authentication) then the credentials 
+consist only of the server's private key and the server's certificate chain.
+
+If the server's certificate is self-signed, then the certificate chain contains only the server's
+self-signed certificate.
+If the server's certificate is CA-signed, then the certificate chain contains the entire certificate
+chain, starting at the server's certificate and going up to the root-CA certificate, with all the
+intermediate-CA certificates in between.
+The code is the same for self-signed and CA-signed certificates: just load the certificate chain.
+
+```python
+def make_credentials():
+    server_private_key = open("keys/server.key", "br").read()
+    server_certificate_chain = open("certs/server.pem", "br").read()
+    private_key_certificate_chain_pairs = [(server_private_key, server_certificate_chain)]
+    credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs)
+    return credentials
+```
+
+When we are doing mutual authentication, i.e. when the server also authenticates the client (in
+addition to the client authenticating the server) we have to also provide the root certificate to
+authenticate the client and we have to set the `require_client_auth` flag to `True`.
+
+```python
+def make_credentials():
+    server_private_key = open("keys/server.key", "br").read()
+    server_certificate_chain = open("certs/server.pem", "br").read()
+    private_key_certificate_chain_pairs = [(server_private_key, server_certificate_chain)]
+    root_certificate_for_client = open("certs/root.crt", "br").read()
+    credentials = grpc.ssl_server_credentials(private_key_certificate_chain_pairs,
+                                              root_certificate_for_client, True)
+    return credentials
+
+```
+
+In the above code fragment, we assumed that the client certificate was CA-signed. If the client
+certificate is self-signed we have to use the client certificate as the root certificate:
+
+```python
+root_certificate_for_client = open("certs/client.crt", "br").read()
+```
+
+The final step is to define the `Adder` class which actually processes the incoming requests from
+clients. It is very simple. Recall that the `adder_pb2_grpc` module was generated by the gRPC
+compiler.
+
+```python
 class Adder(adder_pb2_grpc.AdderServicer):
 
     async def Add(self, request, context):
         reply = adder_pb2.AddReply(sum=request.a + request.b)
         print(f"Server: {request.a} + {request.b} = {reply.sum}")
         return reply
-
-async def serve():
-    server = grpc.aio.server()
-    adder_pb2_grpc.add_AdderServicer_to_server(Adder(), server)
-    server.add_insecure_port("127.0.0.1:50051")
-    await server.start()
-    await server.wait_for_termination()
-
-if __name__ == "__main__":
-    asyncio.run(serve())
 ```
 
-Existing file `client.py` contains the implementation of the unsecured client:
+If mutual authentication is enabled as described earlier, the server will validate the client in the
+sense that it will check that the certificate that was received is properly signed using a signature
+that can be traced back to the trusted root.
+
+However, by default, the server does not perform any authentication check on the client name that
+is stored in the common name or the subject alternative information in the certificate.
+Any client is allowed as long as it has a valid certificate, regardless of the client name.
+
+If we wish to authenticate clients by name, we have to write explicit code for that in the
+`Adder` class. In the following example, we only allowed clients that identify themselves as
+`adder-client` in the certificate.
 
 ```python
-import asyncio
-import grpc
-import adder_pb2
-import adder_pb2_grpc
+class Adder(adder_pb2_grpc.AdderServicer):
 
-async def run_client():
-    async with grpc.aio.insecure_channel("127.0.0.1:50051") as channel:
-        stub = adder_pb2_grpc.AdderStub(channel)
-        request = adder_pb2.AddRequest(a=1, b=2)
-        reply = await stub.Add(request)
-        assert reply.sum == 3
-        print(f"Client: {request.a} + {request.b} = {reply.sum}")
+    async def validate_client(self, context):
+        encoded_allowed_client_name = "adder-client".encode()
+        if encoded_allowed_client_name == context.auth_context()["x509_common_name"]:
+            return
+        if encoded_allowed_client_name in context.peer_identities():
+            return
+        await context.abort(grpc.StatusCode.PERMISSION_DENIED, "Unauthorized client")
 
-if __name__ == "__main__":
-    asyncio.run(run_client())
-```
-
-In one terminal window, start the server:
-```
-python server_unsecured.py
+    async def Add(self, request, context):
+        await self.validate_client(context)
+        reply = adder_pb2.AddReply(sum=request.a + request.b)
+        print(f"Server: {request.a} + {request.b} = {reply.sum}")
+        return reply
 ```
 
-In another terminal window, run the client:
-```
-python client_unsecured.py
-```
-
-The client produces the following output:
-```
-Client: 1 + 2 = 3
-```
-
-Back in the server terminal window, you should see the following server output:
-```
-Server: 1 + 2 = 3
-```
+# CONTINUE FROM HERE
 
 # Client authenticates server using TLS
 
