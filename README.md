@@ -853,6 +853,9 @@ Pass: wrong_client_test_case: location=docker client=evans authentication=mutual
 Pass: wrong_client_test_case: location=docker client=evans authentication=mutual signer=intermediate
 All 232 test cases passed</pre>
 
+If any of the tests fails, you can use the `--verbose` command-line option to see what is going
+wrong: it prints every command that is executed and its output.
+
 On my 2020 MacBook Air, it takes about 9 minutes to complete the full test suite.
 
 If you don't have Docker of Evans installed on your computer, use the corresponding `--skip-...`
@@ -1397,6 +1400,9 @@ $ <b>openssl ca \
   -days 365</b>
 </pre>
 
+Note that the `-config` option points to the configuration file of the signing CA, which is the
+root CA in this example.
+
 This produces the client certificate in file `certs/client.crt`:
 
 File `certs/client.crt`:
@@ -1472,7 +1478,7 @@ $ <b>openssl ca \
   -batch \
   -in admin/intermediate.csr \
   -out certs/intermediate.crt \
-  -config admin/intermediate.config \
+  -config admin/root.config \
   -extfile admin/intermediate_ca.ext \
   -days 730</b>
 </pre>
@@ -1521,13 +1527,144 @@ PMYmB6gK6qVQ25fHTA==
 -----END CERTIFICATE-----
 </pre>
 
-
 ### Generating a root CA certificate
 
+The process for generating a root CA certificate is extremely similar to the process of generating
+an intermediate CA certificate. The configuration files are the same. The only difference is that
+a root CA is self-signed whereas an intermediate CA is CA-signed.
+
+To achieve this, the `openssl ca` command:
+* Uses option `-config admin/root.config` to point to the config file of the root CA, since the
+  root CA is the signing CA.
+* Uses option `-self-sign` to indicate that the certificate is self-signed.
+
+<pre>
+$ <b>openssl ca \
+  -batch \
+  -in admin/root.csr \
+  -out certs/root.crt \
+  -config admin/root.config \
+  -extfile admin/root.ext \
+  -self-sign \
+  -days 1095</b>
+</pre>
+
+This produces the following certificate file `certs/root.crt`:
+
+File `certs/root.crt`:
+<pre>
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 0 (0x0)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=Example Corp Root Certificate Authority
+        Validity
+            Not Before: May 27 14:20:20 2021 GMT
+            Not After : May 26 14:20:20 2024 GMT
+        Subject: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=Example Corp Root Certificate Authority
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:c6:11:0e:5b:9f:3a:3f:14:5b:03:a1:dc:23:4f:
+                    d4:c0:3f:7f:fa:55:88:e8:2f:a9:39:7a:e1:9a:66:
+                    [...]
+                    1e:f1:bc:ae:f0:ba:6c:93:0e:1a:96:81:ba:9a:10:
+                    ac:f9
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: critical
+                CA:TRUE
+            X509v3 Key Usage: critical
+                Certificate Sign
+    Signature Algorithm: sha256WithRSAEncryption
+         0a:91:2b:06:86:bd:32:68:bc:13:81:cd:e2:ed:9c:35:18:11:
+         1b:95:75:6d:cb:72:35:1a:3a:74:83:6d:4d:ba:b0:f8:45:f3:
+         [...]
+         4e:36:70:ce:67:30:c6:f8:a3:64:ec:69:22:3a:a5:45:34:cc:
+         bb:bd:dd:6f
+-----BEGIN CERTIFICATE-----
+MIIDkDCCAnigAwIBAgIBADANBgkqhkiG9w0BAQsFADB5MQswCQYDVQQGEwJVUzEL
+MAkGA1UECAwCV0ExFTATBgNVBAoMDEV4YW1wbGUgQ29ycDEUMBIGA1UECwwLRW5n
+[...]
+E6LbHkLgM8cDZKlCPPKRrAtT+pmjHxHd4kC5keToTjZwzmcwxvijZOxpIjqlRTTM
+u73dbw==
+-----END CERTIFICATE-----
+</pre>
 
 ### Generating self-signed leaf certificate
 
+Generating a self-signed certificate for a leaf (i.e. a server or client) is a special case:
+we use an OpenSSL command that generates both the private key and the certificate in a single step
+without bothering with an certificate signing request (CSR).
+
+<pre>
+$ <b>openssl req \
+  -x509 \
+  -nodes \
+  -text \
+  -newkey rsa:4096 \
+  -keyout keys/client.key \
+  -out certs/client.crt \
+  -config admin/client_req.config \
+  -extensions req_ext \
+  -days 365</b>
+</pre>
+
+This produces the following certificate file:
+
+<pre>
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 14805793253699856195 (0xcd78be8510a7a743)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=localhost
+        Validity
+            Not Before: May 27 14:51:30 2021 GMT
+            Not After : May 27 14:51:30 2022 GMT
+        Subject: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=localhost
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (4096 bit)
+                Modulus:
+                    00:e1:74:1d:3d:55:1d:47:ef:a6:5f:4f:21:4e:76:
+                    a1:ae:ee:ce:93:c7:54:1e:ed:54:c7:4c:fa:f8:05:
+                    [...]
+                    18:96:38:e4:65:80:c4:75:88:a6:f4:b3:32:0f:e9:
+                    e7:a4:93
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Subject Alternative Name:
+                DNS:localhost
+    Signature Algorithm: sha256WithRSAEncryption
+         b5:8b:de:a5:ab:8e:8f:c8:ad:7a:65:15:29:0b:c4:71:5f:75:
+         9f:41:ae:25:02:7c:92:91:00:b1:87:9b:36:fe:bc:c9:fd:93:
+         [...]
+         38:b2:b2:a8:37:03:ad:a0:69:93:c7:55:e3:e4:a3:54:75:cc:
+         d5:fa:ad:3d:52:d0:1d:de
+-----BEGIN CERTIFICATE-----
+MIIFUTCCAzmgAwIBAgIJAM14voUQp6dDMA0GCSqGSIb3DQEBCwUAMFsxCzAJBgNV
+BAYTAlVTMQswCQYDVQQIDAJXQTEVMBMGA1UECgwMRXhhbXBsZSBDb3JwMRQwEgYD
+[...]
+5I4RvUbMyHN5bewPPkmBNySeu3Gye/BXzRtnFRIjLvAZ0+elWJs7QPba4Tiysqg3
+A62gaZPHVePko1R1zNX6rT1S0B3e
+-----END CERTIFICATE-----
+</pre>
+
 ### Generating certificate chains
+
+Some gRPC API calls require a certificate chain rather than an individual certificate.
+
+We use the (non-universal) convention of using the `.crt` extension for files that contain an
+individual certificate, and the `.pem` extension for files that contain a certificate chain.
+
+A certificate chain file is produced simply by concatenating the individual cerficate files:
+
+<pre>
+$ <b>cat certs/client.crt certs/intermediate.crt certs/root.crt >certs/client.pem</b>
+</pre>
 
 # Additional Reading
 
