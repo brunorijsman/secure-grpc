@@ -1157,6 +1157,92 @@ In our example, we close the channel and exit after making one call:
 await channel.close()
 ```
 
+## Key and Certificate Generation Implementation
+
+The `create-keys-and-certs.sh` hides all of the complexity of generating keys and certificates
+using the `openssl` tool chain.
+The theory of generating keys and certificates is not very complex, but the `openssl` tool chain
+is quite temperamental and difficult to use.
+
+### Generating a private key
+
+We need to produce private keys for the leaves (the server and the client) and for the certificate
+authorities (the root CA and the intermediate CA). In this example we will be producing a private
+for the client.
+
+The following command generates a 2048 bit RSA key and stores it in file `client.key`.
+
+<pre>
+$ <b>openssl genrsa -out client.key 2048</b>
+Generating RSA private key, 2048 bit long modulus
+.....+++
+..............................................................................................+++
+e is 65537 (0x10001)
+</pre>
+
+File `client.key` is typically referred to as a private key file.
+In reality is doesn't contain the private key per-se, but a set of parameters from which both
+the private and the public key can be generated.
+
+The private key file is secret, must be stored in a secure location that is only accessible to the
+owner of the private key. For example, the client private key must be stored in a location where
+only the client has access.
+
+The contents of the `client.key` file look like gibberish; not because it is encrypted but rather
+because it is encoded using the ASN.1 encoding rules and a base-64 representation:
+
+```
+$ <b>cat client.key</b>
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpQIBAAKCAQEA0zptDHxc3MiD/Bpa24ike+xcaBQr1BjSDOEwPOkILtBJRudk
+avac0uwfWbYn2DILccYirmt2uLtvyFEmNtk7JVb5rte8lsVO0qNAW+i4jsafk7rd
+[...]
+AA6ye3CdLoc5EDdGK9y3CDTtt2w+3ulZp+jnJN89MmsJ0d06bWTfZTcHVFt2bVFi
+jKesxM94ejX2SFd44Sv7prv9qTO/94NmCfRi7HTtrFrTUZ0qK1rEuXM=
+-----END RSA PRIVATE KEY-----
+```
+
+You can convert the private key file into a human-readable form using the following command.
+
+<pre>
+$ <b>openssl rsa -noout -text -in client.key</b>
+Private-Key: (2048 bit)
+modulus:
+    00:d3:3a:6d:0c:7c:5c:dc:c8:83:fc:1a:5a:db:88:
+    [...]
+    d1:1b:a3:26:b6:0c:63:da:a9:7a:a9:cd:7f:0e:69:
+    7b:4d
+publicExponent: 65537 (0x10001)
+privateExponent:
+    51:f1:48:7c:9f:82:26:e4:62:cf:5a:2a:05:20:6d:
+    [...]
+    79:dc:c7:45:dc:4d:47:3a:55:3a:ee:20:0e:13:c4:
+    01
+prime1:
+    00:f7:9f:bb:f1:b2:65:b7:c7:a3:3b:d4:5b:f3:fc:
+    [...]
+    d6:97:15:32:53:05:48:2f:b1
+prime2:
+    00:da:5f:87:25:ed:52:3b:4e:b0:7e:ca:b4:4e:f5:
+    [...]
+    8b:3b:54:c6:13:bf:24:a8:5d
+exponent1:
+    00:9e:4e:86:6f:2c:a8:0e:e8:18:99:65:58:2c:11:
+    [...]
+    a7:49:0b:8a:12:bd:6b:ba:e1
+exponent2:
+    00:c8:b9:26:30:e6:83:bf:a0:04:fb:86:b7:56:1c:
+    [...]
+    09:a6:ef:b5:62:51:40:10:c1
+coefficient:
+    00:b7:f8:44:40:f5:45:de:6e:af:78:01:91:9a:d5:
+    [...]
+    d3:51:9d:2a:2b:5a:c4:b9:73
+</pre>
+
+
+### Generating a self-signed leaf certificate
+
 # CONTINUE FROM HERE
 
 # Client authenticates server using TLS
