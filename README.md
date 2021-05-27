@@ -1173,7 +1173,7 @@ for the client.
 The following command generates a 2048 bit RSA key and stores it in file `client.key`.
 
 <pre>
-$ <b>openssl genrsa -out client.key 2048</b>
+$ <b>openssl genrsa -out keys/client.key 2048</b>
 Generating RSA private key, 2048 bit long modulus
 .....+++
 ..............................................................................................+++
@@ -1192,7 +1192,7 @@ The contents of the `client.key` file look like gibberish; not because it is enc
 because it is encoded using the ASN.1 encoding rules and a base-64 representation:
 
 ```
-$ <b>cat client.key</b>
+$ <b>cat keys/client.key</b>
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpQIBAAKCAQEA0zptDHxc3MiD/Bpa24ike+xcaBQr1BjSDOEwPOkILtBJRudk
 avac0uwfWbYn2DILccYirmt2uLtvyFEmNtk7JVb5rte8lsVO0qNAW+i4jsafk7rd
@@ -1205,7 +1205,7 @@ jKesxM94ejX2SFd44Sv7prv9qTO/94NmCfRi7HTtrFrTUZ0qK1rEuXM=
 You can convert the private key file into a human-readable form using the following command.
 
 <pre>
-$ <b>openssl rsa -noout -text -in client.key</b>
+$ <b>openssl rsa -noout -text -in keys/client.key</b>
 Private-Key: (2048 bit)
 modulus:
     00:d3:3a:6d:0c:7c:5c:dc:c8:83:fc:1a:5a:db:88:
@@ -1240,10 +1240,93 @@ coefficient:
     d3:51:9d:2a:2b:5a:c4:b9:73
 </pre>
 
+### Generating a certificate signing request (CSR)
 
-### Generating a self-signed leaf certificate
+To create a certificate we must first generate a certificate signing request (CSR).
+The CSR contains all the information that we want to be in the certificate.
+The CSR is given to the certificate authority (CA).
+The CA validates that the information in the CSR is correct and truthful, and if so, the CA
+generates a certificate with the information from the CSR and signs it with the CA private key.
+The CA then gives the generated certificate back to the requesting party.
+
+To generate a CSR with OpenSSL we first prepare a request configuration file that looks similar to
+this (in this example we are generating a CSR for the client):
+
+File `admin/client_req.config`:
+<pre>
+[req]
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+prompt             = no
+
+[req_distinguished_name]
+countryName            = US
+stateOrProvinceName    = WA
+organizationName       = Example Corp
+organizationalUnitName = Engineering
+commonName             = adder-client-host
+
+[req_ext]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = adder-client-host
+</pre>
+
+Then we use the following OpenSSL command to actually generate the CSR file:
+
+<pre>
+$ <b>openssl req \
+  -new \
+  -text \
+  -key keys/client.key \
+  -out admin/client.csr \
+  -config admin/client_req.config \
+  -extensions req_ext</b>
+</pre>
+
+This generates a CSR file similar to the following.
+Note that the CSR file contains the information in both encoded and decoded form (this is because
+of the `-text` option):
+
+<pre>
+$ <b>cat admin/client.csr</b>
+Certificate Request:
+    Data:
+        Version: 0 (0x0)
+        Subject: C=US, ST=WA, O=Example Corp, OU=Engineering, CN=adder-client-host
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:c1:97:3d:c7:43:7f:b0:f6:aa:48:e8:16:7e:83:
+                    c2:fe:de:c8:cb:24:8f:1e:2d:c0:b0:c1:07:d1:46:
+                    [...]
+                    51:a5:ba:ae:c7:61:94:81:c1:5f:9e:9a:e9:71:70:
+                    e2:81
+                Exponent: 65537 (0x10001)
+        Attributes:
+        Requested Extensions:
+            X509v3 Subject Alternative Name:
+                DNS:adder-client-host
+    Signature Algorithm: sha256WithRSAEncryption
+         7e:a2:f3:1a:e7:7b:9c:f7:66:42:91:17:53:83:d5:83:7f:54:
+         0a:87:af:06:bc:dd:7c:e5:4d:d9:11:21:7e:e9:30:32:0c:ff:
+         [...]
+         94:06:55:24:1a:d0:ab:57:8b:20:db:80:49:b7:50:00:f0:75:
+         59:bb:7b:1a
+-----BEGIN CERTIFICATE REQUEST-----
+MIIC1zCCAb8CAQAwYzELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAldBMRUwEwYDVQQK
+DAxFeGFtcGxlIENvcnAxFDASBgNVBAsMC0VuZ2luZWVyaW5nMRowGAYDVQQDDBFh
+[...]
+4HxWGju72nZcm/KExahtjaJUkkMl+S51KKqYUOIduPCk7RVdpJQGVSQa0KtXiyDb
+gEm3UADwdVm7exo=
+-----END CERTIFICATE REQUEST-----
+</pre>
 
 # CONTINUE FROM HERE
+
+### Generating a self-signed leaf certificate
 
 # Client authenticates server using TLS
 
