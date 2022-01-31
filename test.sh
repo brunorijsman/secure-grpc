@@ -240,9 +240,9 @@ function start_server ()
         while [[ $server_container_id == "" ]]; do
             server_container_id=$(docker ps --filter name=adder-server-host --quiet)
         done
-        sleep 0.2
+        sleep 0.4
     fi
-    sleep 0.2
+    sleep 0.4
 
     eval $server_pid_return_var="'$start_server_pid'"
 }

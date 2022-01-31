@@ -377,9 +377,9 @@ function create_leaf_certificate_chain ()
     local signer_role="$2"
 
     if [[ $signer_role == "root" ]]; then
-        cat certs/${role}.crt certs/root.crt >certs/${role}.pem
+        cat certs/${role}.crt >certs/${role}.pem
     elif [[ $signer_role == "intermediate" ]]; then
-        cat certs/${role}.crt certs/intermediate.crt certs/root.crt >certs/${role}.pem
+        cat certs/${role}.crt certs/intermediate.crt >certs/${role}.pem
     else
         cat certs/${role}.crt >certs/${role}.pem
     fi
